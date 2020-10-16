@@ -18,7 +18,7 @@ public:
     graph_buffer(size_t size) { 
         alloc(size);
     }
-    ~graph_buffer() { if(this->array) free(this->array); }
+    ~graph_buffer() { this->destroy(); }
 
     void alloc(size_t size) { 
         this->capacity = size;
@@ -32,7 +32,12 @@ public:
         this->bsize = 0;
     }
 
-    void destroy() { if(this->array) free(this->array); }
+    void destroy() { 
+        if(this->array) free(this->array);
+        this->array = NULL;
+        this->bsize = 0;
+        this->capacity = 0;
+    }
 
     T& operator[](size_t off) {
         assert(off < this->bsize);

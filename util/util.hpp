@@ -21,7 +21,7 @@ std::string concatnate_name(std::string filename, T val) {
 
 template<typename T>
 void appendfile(std::string filename, T *array, size_t bsize) {
-    int fd = open(filename.c_str(), O_WRONLY | O_APPEND | O_CREAT);
+    int fd = open(filename.c_str(), O_WRONLY | O_APPEND | O_CREAT, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
     assert(fd >= 0);
     pwrite(fd, (char*)array, bsize * sizeof(T), 0);
     close(fd);

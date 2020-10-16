@@ -11,3 +11,6 @@ test/% : test/%.cpp
 
 clean :
 	-rm -rf bin
+
+clear : 
+	-rm dataset/*.deg dataset/*.csr dataset/*.beg

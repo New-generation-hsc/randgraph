@@ -51,14 +51,13 @@ private:
     /* for buffer */
     vid_t buf_vstart; /* current buffer start vertex */
     eid_t buf_estart; /* current buffer start edge */
-    vid_t buf_vertices;
-    eid_t buf_edges;
     eid_t rd_edges;
     eid_t csr_pos;
 
     void flush_beg_pos() {
         std::string name = concatnate_name(output_filename, fnum) + ".beg";
         appendfile(name, beg_pos.buffer_begin(), beg_pos.size());
+        buf_vstart += deg.size();
         beg_pos.clear();
     }
 
@@ -70,9 +69,14 @@ private:
 
     void flush_csr() {
         size_t max_nedges = FILE_SIZE / sizeof(eid_t);
-        if(rd_edges + csr.size() > max_nedges) fnum += 1;
+        if(rd_edges + csr.size() > max_nedges) {
+            fnum += 1;
+            rd_edges = 0;
+        }
         std::string name = concatnate_name(output_filename, fnum) + ".csr";
         appendfile(name, csr.buffer_begin(), csr.size());
+        rd_edges += csr.size();
+        buf_estart += csr.size();
         csr.clear();
     }
 
@@ -97,7 +101,7 @@ public:
         beg_pos.alloc(VERT_SIZE);
         csr.alloc(EDGE_SIZE);
         deg.alloc(VERT_SIZE);
-        curr_vert = max_vert = buf_vstart = buf_estart = buf_vertices = buf_edges = rd_edges = csr_pos = 0;
+        curr_vert = max_vert = buf_vstart = buf_estart = rd_edges = csr_pos = 0;
     }
     graph_converter(std::string output, size_t vert_size, size_t edge_size) {
         output_filename = output;
@@ -105,7 +109,7 @@ public:
         beg_pos.alloc(vert_size);
         csr.alloc(edge_size);
         deg.alloc(vert_size);
-        curr_vert = max_vert = buf_vstart = buf_estart = buf_vertices = buf_edges = rd_edges = csr_pos = 0;
+        curr_vert = max_vert = buf_vstart = buf_estart = rd_edges = csr_pos = 0;
     }
     ~graph_converter() {
         beg_pos.destroy();
@@ -117,7 +121,7 @@ public:
         beg_pos.clear();
         csr.clear();
         deg.clear();
-        curr_vert = max_vert = buf_vstart = buf_estart = buf_vertices = buf_edges = rd_edges = csr_pos = 0;
+        curr_vert = max_vert = buf_vstart = buf_estart = rd_edges = csr_pos = 0;
         beg_pos.push_back(0);
     }
 
@@ -143,10 +147,10 @@ public:
     }
 
     void flush_buffer() {
+        logstream(LOG_INFO) << "Buffer : [ " << buf_vstart << ", " <<  buf_vstart + beg_pos.size() << " ), csr position : [ " << buf_estart << ", " << csr_pos << ")" << std::endl;
         if(!csr.empty()) flush_csr();
         if(!beg_pos.empty()) flush_beg_pos();
         if(!deg.empty()) flush_degree();
-        logstream(LOG_INFO) << "Buffer : [ " << buf_vstart << ", " << curr_vert - 1 << " ], csr position : [ " << buf_estart << ", " << csr_pos << ")" << std::endl;
     }
 
     void finalize() {
@@ -154,8 +158,10 @@ public:
         if(max_vert > curr_vert) sync_zeros(max_vert - curr_vert);
         flush_buffer();
 
-        logstream(LOG_INFO) << "nvertices = " << max_vert + 1 << ", nedges = " << csr_pos << std::endl;
+        logstream(LOG_INFO) << "nvertices = " << max_vert + 1 << ", nedges = " << csr_pos << ", files : " << fnum + 1 << std::endl;
     }
+
+    int get_fnum() { return this->fnum + 1; }
 };
 
 size_t convert(std::string filename, graph_converter &converter) {
