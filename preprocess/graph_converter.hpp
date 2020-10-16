@@ -57,18 +57,18 @@ private:
     void flush_beg_pos() {
         std::string name = concatnate_name(output_filename, fnum) + ".beg";
         appendfile(name, beg_pos.buffer_begin(), beg_pos.size());
-        buf_vstart += deg.size();
         beg_pos.clear();
     }
 
     void flush_degree() { 
         std::string name = concatnate_name(output_filename, fnum) + ".deg";
         appendfile(name, deg.buffer_begin(), deg.size());
+        buf_vstart += deg.size();
         deg.clear();
     }
 
     void flush_csr() {
-        size_t max_nedges = FILE_SIZE / sizeof(eid_t);
+        eid_t max_nedges = (eid_t)FILE_SIZE / sizeof(vid_t);
         if(rd_edges + csr.size() > max_nedges) {
             fnum += 1;
             rd_edges = 0;
@@ -147,7 +147,7 @@ public:
     }
 
     void flush_buffer() {
-        logstream(LOG_INFO) << "Buffer : [ " << buf_vstart << ", " <<  buf_vstart + beg_pos.size() << " ), csr position : [ " << buf_estart << ", " << csr_pos << ")" << std::endl;
+        logstream(LOG_INFO) << "Buffer : [ " << buf_vstart << ", " <<  buf_vstart + deg.size() << " ), csr position : [ " << buf_estart << ", " << csr_pos << " )" << std::endl;
         if(!csr.empty()) flush_csr();
         if(!beg_pos.empty()) flush_beg_pos();
         if(!deg.empty()) flush_degree();
