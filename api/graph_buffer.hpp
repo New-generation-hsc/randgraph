@@ -1,6 +1,7 @@
 #ifndef _GRAPH_BUFFER_H_
 #define _GRAPH_BUFFER_H_
 
+#include <assert.h>
 /** This file defines the buffer data structure used in graph processing */
 
 template<typename T>

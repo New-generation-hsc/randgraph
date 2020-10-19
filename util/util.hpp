@@ -40,4 +40,24 @@ std::string remove_extension(std::string const & filename) {
     return p>0&&p!=std::string::npos ? filename.substr(0, p) : filename;
 }
 
+inline std::string get_beg_pos_name(std::string base_name, int fnum) {
+    return concatnate_name(base_name, fnum) + ".beg";
+}
+
+inline std::string get_csr_name(std::string base_name, int fnum) { 
+    return concatnate_name(base_name, fnum) + ".csr";
+}
+
+inline std::string get_degree_name(std::string base_name, int fnum) { 
+    return concatnate_name(base_name, fnum) + ".deg";
+}
+
+inline std::string get_vert_blocks_name(std::string base_name, size_t blocksize) {
+    return concatnate_name(base_name, blocksize / (1024 * 1024)) + "MB.vert.blocks";
+}
+
+inline std::string get_edge_blocks_name(std::string base_name, size_t blocksize) {
+    return concatnate_name(base_name, blocksize / (1024 * 1024)) + "MB.edge.blocks";
+}
+
 #endif
