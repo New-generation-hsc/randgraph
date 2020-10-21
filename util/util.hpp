@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <cstdio>
 
 #define max_value(a, b) (((a) > (b)) ? (a) : (b))
 #define min_value(a, b) (((a) < (b)) ? (a) : (b))
@@ -40,24 +41,52 @@ std::string remove_extension(std::string const & filename) {
     return p>0&&p!=std::string::npos ? filename.substr(0, p) : filename;
 }
 
-inline std::string get_beg_pos_name(std::string base_name, int fnum) {
+inline std::string get_beg_pos_name(std::string const & base_name, int fnum) {
     return concatnate_name(base_name, fnum) + ".beg";
 }
 
-inline std::string get_csr_name(std::string base_name, int fnum) { 
+inline std::string get_csr_name(std::string const & base_name, int fnum) { 
     return concatnate_name(base_name, fnum) + ".csr";
 }
 
-inline std::string get_degree_name(std::string base_name, int fnum) { 
+inline std::string get_degree_name(std::string const & base_name, int fnum) { 
     return concatnate_name(base_name, fnum) + ".deg";
 }
 
-inline std::string get_vert_blocks_name(std::string base_name, size_t blocksize) {
+inline std::string get_vert_blocks_name(std::string const & base_name, size_t blocksize) {
     return concatnate_name(base_name, blocksize / (1024 * 1024)) + "MB.vert.blocks";
 }
 
-inline std::string get_edge_blocks_name(std::string base_name, size_t blocksize) {
+inline std::string get_edge_blocks_name(std::string const & base_name, size_t blocksize) {
     return concatnate_name(base_name, blocksize / (1024 * 1024)) + "MB.edge.blocks";
+}
+
+inline std::string get_ratio_name(std::string const & base_name, int fnum) {
+    return concatnate_name(base_name, fnum) + ".rat";
+}
+
+/** test a file existence */
+inline bool test_exists(const std::string & filename) { 
+    struct stat buffer;
+    return (stat(filename.c_str(), &buffer) == 0);
+}
+
+/** test a file existence and if the file exist then delete it */
+inline bool test_delete(const std::string & filename) { 
+    if(test_exists(filename)) {
+        std::remove(filename.c_str());
+        return true;
+    }
+    return false;
+}
+
+/** given data vertex, return the block that the vertex belongs to */
+bid_t get_block(std::vector<vid_t>& vblocks, vid_t v) {
+    bid_t nblocks = vblocks.size() - 1;
+    for(bid_t p = 0; p < nblocks; p++) {
+        if(v < vblocks[p+1]) return p;
+    }
+    return nblocks;
 }
 
 #endif

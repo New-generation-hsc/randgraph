@@ -9,6 +9,7 @@
 #include "api/types.hpp"
 #include "logger/logger.hpp"
 #include "util/util.hpp"
+#include "util/io.hpp"
 
 /** This file defines the data structure that contribute to convert the text format graph to some specific format */
 
@@ -248,6 +249,61 @@ size_t split_blocks(std::string filename, int fnum, size_t block_size = BLOCK_SI
     eblf.close();
 
     return vblocks.size() - 1;
+}
+
+/** compute the given graph each vertex point to the same block ratio */
+void compute_graph_degree_ratio(const std::string& filename, int fnum, size_t blocksize = BLOCK_SIZE) { 
+    std::string vert_block_name = get_vert_blocks_name(filename, blocksize);
+    std::string edge_block_name = get_edge_blocks_name(filename, blocksize);
+    std::string degree_name     = get_degree_name(filename, fnum);
+    std::string csr_name        = get_csr_name(filename, fnum);
+    std::string output          = get_ratio_name(filename, fnum);
+
+    std::vector<vid_t> vblocks = load_graph_blocks<vid_t>(vert_block_name);
+    std::vector<eid_t> eblocks = load_graph_blocks<eid_t>(edge_block_name);
+
+    int vertdesc = open(degree_name.c_str(), O_RDONLY);
+    int edgedesc = open(csr_name.c_str(), O_RDONLY);
+    assert(vertdesc > 0 && edgedesc > 0);
+
+    bid_t nblocks = vblocks.size() - 1;
+    logstream(LOG_INFO) << "load vblocks and eblocks successfully, block count : " << nblocks << std::endl;
+    vid_t *degree = NULL, *csr = NULL;
+    float *ratio = NULL;
+    for(bid_t blk = 0; blk < nblocks; blk++) { 
+        vid_t nverts = vblocks[blk+1] - vblocks[blk];
+        eid_t nedges = eblocks[blk+1] - eblocks[blk];
+
+        degree = (vid_t*)realloc(degree, nverts * sizeof(vid_t));
+        ratio  = (float *)realloc(ratio, nverts * sizeof(float));
+        for(vid_t v = 0; v < nverts; v++) ratio[v] = 0.0;
+        csr    = (vid_t*)realloc(csr, nedges * sizeof(vid_t));
+        assert(degree != NULL && ratio != NULL && csr != NULL);
+        logstream(LOG_INFO) << "start load block " << blk << ", vert range : [ " << vblocks[blk] << ", " << vblocks[blk+1] << " ), edge range : [ " << eblocks[blk] << ", " << eblocks[blk+1] << " )" << std::endl;
+        load_block_range(vertdesc, degree, nverts, vblocks[blk] * sizeof(vid_t));
+        load_block_range(edgedesc, csr,    nedges, eblocks[blk] * sizeof(vid_t));
+
+        eid_t edge_pos = 0;
+        for(vid_t v = 0; v < nverts; v++) {
+            if(degree[v] == 0) continue;
+            float sum = 0.0;
+            vid_t deg = degree[v];
+            assert(edge_pos + deg <= nedges);
+            for(eid_t e = edge_pos; e < edge_pos + deg; e++) {
+                bid_t dst = get_block(vblocks, csr[e]);
+                if(dst == blk) sum += 1.0 / (float)deg;
+            }
+            ratio[v] = sum;
+            edge_pos += deg;
+        }
+        assert(edge_pos == nedges);
+        appendfile(output,ratio, nverts);
+    }
+    
+    /** free the allocate memory */
+    if(degree) free(degree);
+    if(csr)    free(csr);
+    if(ratio)  free(ratio);
 }
 
 #endif
