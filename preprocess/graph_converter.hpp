@@ -252,7 +252,7 @@ size_t split_blocks(std::string filename, int fnum, size_t block_size = BLOCK_SI
     std::string metafile = get_meta_name(filename);
     auto metastream = std::fstream(metafile.c_str(), std::ios::out | std::ios::binary);
     metastream.write((char*)&vblocks.back(), sizeof(vid_t));
-    metastream.write((char*)eblocks.back(), sizeof(eid_t));
+    metastream.write((char*)&eblocks.back(), sizeof(eid_t));
     metastream.close();
 
     return vblocks.size() - 1;

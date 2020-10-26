@@ -26,6 +26,14 @@ std::vector<T> load_graph_blocks(std::string name) {
     return blocks;
 }
 
+void load_graph_meta(std::string base_name, vid_t *nvertices, eid_t *nedges) {
+    std::string metafile = get_meta_name(base_name);
+    auto metastream = std::fstream(metafile.c_str(), std::ios::in | std::ios::binary);
+    metastream.read((char*)nvertices, sizeof(vid_t));
+    metastream.read((char*)nedges, sizeof(eid_t));
+    metastream.close();
+}
+
 template<typename T>
 void load_block_range(int fd, T *buf, size_t count, off_t off) {
     size_t nbr = 0;  /* number of bytes has read */

@@ -3,7 +3,7 @@ CC = g++
 INCLUDE = -I.
 FLAGS = -std=c++11 -lpthread
 
-apps : test/test
+apps : test/test test/walk
 
 test/% : test/%.cpp
 	@mkdir -p bin/$(@D)
@@ -13,4 +13,7 @@ clean :
 	-rm -rf bin
 
 clear : 
-	-rm dataset/*.deg dataset/*.csr dataset/*.beg
+	-rm dataset/*.deg dataset/*.csr dataset/*.beg dataset/*.rat dataset/*.blocks dataset/*.meta
+
+walks:
+	-rm dataset/*.walk
