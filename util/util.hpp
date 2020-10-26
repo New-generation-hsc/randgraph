@@ -69,6 +69,10 @@ inline std::string get_walk_name(std::string const & base_name, bid_t blk) {
     return concatnate_name(base_name, blk) + ".walk";
 }
 
+inline std::string get_meta_name(std::string const & base_name) {
+    return base_name + ".meta";
+}
+
 /** test a file existence */
 inline bool test_exists(const std::string & filename) { 
     struct stat buffer;
