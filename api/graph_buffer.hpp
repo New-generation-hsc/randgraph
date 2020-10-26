@@ -2,6 +2,7 @@
 #define _GRAPH_BUFFER_H_
 
 #include <assert.h>
+#include <cstddef>
 /** This file defines the buffer data structure used in graph processing */
 
 template<typename T>
@@ -45,7 +46,7 @@ public:
         return this->array[off];
     }
 
-    T* buffer_begin() { return this->array; }
+    T* &buffer_begin() { return this->array; }
     size_t size() const { return this->bsize; } 
 
     bool push_back(T val) {
@@ -66,6 +67,10 @@ public:
 
     void clear() {
         this->bsize = 0;
+    }
+
+    void set_size(size_t _size) {
+        this->size = _size;
     }
 };
 

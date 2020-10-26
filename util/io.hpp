@@ -36,8 +36,22 @@ void load_block_range(int fd, T *buf, size_t count, off_t off) {
         assert(ret > 0);
         bufptr += ret;
         nbr += ret;
+        off += ret;
     }
 }
 
+template<typename T>
+void dump_block_range(int fd, T *buf, size_t count, off_t off) {
+    size_t nbw = 0; /* number of bytes has written */
+    size_t total = sizeof(T) * count;
+    char *bufptr = (char*) buf;
+    while(nbw < total) {
+        size_t ret = pwrite(fd, bufptr, total - nbw, off);
+        assert(ret > 0);
+        bufptr += ret;
+        nbw += ret;
+        off += ret;
+    }
+}
 
 #endif
