@@ -1,7 +1,7 @@
 
 CC = g++
 INCLUDE = -I.
-FLAGS = -std=c++11 -lpthread
+FLAGS = -std=c++11 -lpthread -fopenmp -Wall
 
 apps : test/test test/walk
 

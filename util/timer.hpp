@@ -4,11 +4,11 @@
 #include <sys/time.h>
 #include <stdlib.h>
 
-class timer_t {
+class graph_timer {
 private:
     timeval start, end;
 public:
-    timer_t() { }
+    graph_timer() { }
 
     void start_time() {
         gettimeofday(&start, NULL);

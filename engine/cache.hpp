@@ -4,10 +4,13 @@
 #include <vector>
 #include <cstdlib>
 #include <cassert>
+#include <mutex>
+#include <memory>
 
 #include "api/constants.hpp"
 #include "api/types.hpp"
-#include "schedule.hpp"
+#include "util/util.hpp"
+#include "util/io.hpp"
 #include "config.hpp"
 
 /**
@@ -29,18 +32,20 @@ enum block_state {
 
 class block_t {
 public:
-    bid_t blk;                      /* the block number */
-    vid_t start_vert, nverts;       /* block start vertex and the number of vertex in block */
-    eid_t start_edge, nedges;       /* block start edge and the number of edges in this block */
+    bid_t blk;                          /* the block number */
+    vid_t start_vert, nverts;           /* block start vertex and the number of vertex in block */
+    eid_t start_edge, nedges;           /* block start edge and the number of edges in this block */
 
-    block_state status;             /* indicate the state of this block */
-    rank_t rank;                    /* record the block rank */
+    block_state status;                 /* indicate the state of this block */
+    rank_t rank;                        /* record the block rank */
+    std::shared_ptr<std::mutex> mtx;    /* mutex for safe update the rank */
 
     block_t() {
         blk = 0;
         start_vert = nverts = 0;
         start_edge = nedges = 0;
         status  = INACTIVE;
+        mtx = std::make_shared<std::mutex>();
     }
 
     block_t& operator=(const block_t& other) {
@@ -117,6 +122,7 @@ public:
 
     void update_rank(vid_t dst) {
         bid_t blk = get_block(dst);
+        std::lock_guard<std::mutex> lock(*blocks[blk].mtx);
         blocks[blk].rank += 1;
     }
 
@@ -135,13 +141,13 @@ public:
     bid_t nrblock;                  /* number of cache blocks are used for running */
     std::vector<cache_block> cache_blocks; /* the cached blocks */
 
-    graph_cache(size_t blocksize = BLOCK_SIZE) { 
+    graph_cache(bid_t nblocks, size_t blocksize = BLOCK_SIZE) { 
         nrblock = 0;
-        setup(blocksize);
+        setup(nblocks, blocksize);
     }
 
-    void setup(size_t blocksize = BLOCK_SIZE) {
-        ncblock = MEMORY_CACHE / blocksize;
+    void setup(bid_t nblocks, size_t blocksize = BLOCK_SIZE) {
+        ncblock = min_value(nblocks, MEMORY_CACHE / blocksize);
         assert(ncblock > 0);
         cache_blocks.resize(ncblock);
     }

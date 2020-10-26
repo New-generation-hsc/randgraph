@@ -10,7 +10,7 @@
 #include "util/util.hpp"
 #include "apps/randomwalk.hpp"
 
-int mian(int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
     assert(argc >= 2);
     logstream(LOG_INFO) << "app : " << argv[0] << ", dataset : " << argv[1] << std::endl;
     std::string input = argv[1];
@@ -25,7 +25,7 @@ int mian(int argc, char* argv[]) {
         base_name,
         0,
         BLOCK_SIZE,
-        omp_get_num_threads(),
+        (tid_t)omp_get_num_threads(),
         nvertices,
         nedges
     };
@@ -34,7 +34,7 @@ int mian(int argc, char* argv[]) {
     graph_driver driver;
     graph_scheduler block_scheduler(&conf, blocks);
     graph_walk walk_mangager(conf, blocks, driver);
-    graph_cache cache(conf.blocksize);
+    graph_cache cache(blocks.nblocks, conf.blocksize);
     
     randomwalk_t userprogram(10000, 25, 0.15);
     graph_engine engine(cache, walk_mangager, driver, conf);

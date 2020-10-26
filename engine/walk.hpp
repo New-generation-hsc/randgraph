@@ -6,11 +6,19 @@
 #include "api/graph_buffer.hpp"
 #include "cache.hpp"
 
-struct walk_t { 
-    hid_t hop   : 16;
-    vid_t pos    : 24;   /* current walk current pos vertex */
-    vid_t source : 24;   /* walk source vertex */
-};
+walk_t walk_encode(hid_t hop, vid_t curr, vid_t source) {
+    walk_t walk;
+    walk.hop   = hop;
+    walk.pos    = curr & 0xffffff;
+    walk.source = source & 0xffffff;
+    return walk;
+}
+
+walk_t walk_recode(walk_t walk, hid_t hop, vid_t curr) {
+    walk.hop = hop;
+    walk.pos  = curr & 0xffffff;
+    return walk;
+}
 
 class graph_walk {
 public:
@@ -19,8 +27,8 @@ public:
     tid_t nthreads;     /* number of threads */
     graph_block *global_blocks;
 
-    std::vector<wid_t>     block_nmwalk;  /* record each block number of walks in memroy */
-    std::vector<wid_t>     block_ndwalk;  /* record each block number of walks in disk */
+    std::vector<std::vector<wid_t>>     block_nmwalk;  /* record each block number of walks in memroy */
+    std::vector<std::vector<wid_t>>     block_ndwalk;  /* record each block number of walks in disk */
     std::vector<int>       block_desc;     /* the descriptor of each block walk file */
     graph_buffer<walk_t> **block_walks;   /* the walk resident in memory */
     graph_buffer<walk_t>   walks;         /* the walks in cuurent block */
@@ -34,9 +42,16 @@ public:
         global_blocks = &blocks;
 
         block_nmwalk.resize(global_blocks->nblocks);
-        std::fill(block_nmwalk.begin(), block_nmwalk.end(), 0);
+        for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
+            block_nmwalk[blk].resize(nthreads);
+            std::fill(block_nmwalk[blk].begin(), block_nmwalk[blk].end(), 0);
+        }
+
         block_ndwalk.resize(global_blocks->nblocks);
-        std::fill(block_ndwalk.begin(), block_ndwalk.end(), 0);
+        for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
+            block_ndwalk[blk].resize(nthreads);
+            std::fill(block_ndwalk[blk].begin(), block_ndwalk[blk].end(), 0);
+        }
 
         block_desc.resize(global_blocks->nblocks);
         for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) { 
@@ -70,7 +85,7 @@ public:
     }
 
     void move_walk(walk_t oldwalk, bid_t blk, tid_t t, vid_t dst, hid_t hop) {
-        block_nmwalk[blk] += 1;
+        block_nmwalk[blk][t] += 1;
         walk_t newwalk = walk_recode(oldwalk, hop, dst);
         block_walks[t][blk].push_back(newwalk);
         global_blocks->update_rank(dst);
@@ -81,15 +96,15 @@ public:
 
     void persistent_walks(tid_t t, bid_t blk) {
         global_driver->dump_walk(block_desc[blk], block_walks[t][blk]);
-        block_ndwalk[blk] += block_walks[t][blk].size();
-        block_nmwalk[blk] -= block_walks[t][blk].size();
+        block_ndwalk[blk][t] += block_walks[t][blk].size();
+        block_nmwalk[blk][t] -= block_walks[t][blk].size();
         block_walks[t][blk].clear();
     }
 
     wid_t nwalks() {
         wid_t walksum = 0;
         for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
-            walksum += block_nmwalk[blk] + block_ndwalk[blk];
+            walksum += this->nblockwalks(blk);
         }
         return walksum;
     }
@@ -98,31 +113,62 @@ public:
         wid_t walk_sum = 0;
         for(bid_t p = 0; p < cache->nrblock; p++) {
             bid_t blk = cache->cache_blocks[p].block->blk;
-            walk_sum += this->block_nmwalk[blk] + this->block_ndwalk[blk];
+            walk_sum += this->nblockwalks(blk);
         }
         return walk_sum;
     }
 
     wid_t nblockwalks(bid_t blk) {
-        return block_nmwalk[blk] + block_ndwalk[blk];
+        wid_t walksum = 0;
+        for(tid_t t = 0; t < nthreads; t++) {
+            walksum += block_nmwalk[blk][t] + block_ndwalk[blk][t];
+        }
+        return walksum;
+    }
+
+    wid_t nmwalks(bid_t exec_block) {
+        wid_t walksum = 0;
+        for(tid_t t = 0; t < nthreads; t++) {
+            walksum += block_nmwalk[exec_block][t];
+        }
+        return walksum;
+    }
+
+    wid_t ndwalks(bid_t exec_block) { 
+        wid_t walksum = 0;
+        for(tid_t t = 0; t < nthreads; t++) {
+            walksum += block_ndwalk[exec_block][t];
+        }
+        return walksum;
     }
 
     void load_walks(bid_t exec_block) {
-        wid_t walk_count = block_nmwalk[exec_block] + block_ndwalk[exec_block];
-        walks.alloc(walk_count);
-        global_driver->load_walk(block_desc[exec_block], walk_count, walks);
+        wid_t mwalk_count = this->nmwalks(exec_block), dwalk_count = this->ndwalks(exec_block);
+        walks.alloc(mwalk_count + dwalk_count);
+        global_driver->load_walk(block_desc[exec_block], dwalk_count, walks);
+        
+        /** load the in-memory */
+        for(tid_t t = 0; t < nthreads; t++) {
+            if(block_walks[t][exec_block].empty()) continue;
+            for(wid_t w = 0; w < block_walks[t][exec_block].size(); w++) {
+                walks.push_back(block_walks[t][exec_block][w]);
+            }
+        }
+
+        assert(walks.size() == mwalk_count + dwalk_count);
     }
 
     void dump_walks(bid_t exec_block) {
-        global_driver->dump_walk(block_desc[exec_block], walks);
         walks.destroy();
-    }
-
-    void cleanup(bid_t exec_block) {
-        block_ndwalk[exec_block] = 0;
-        block_nmwalk[exec_block] = 0;
+        std::fill(block_ndwalk[exec_block].begin(), block_ndwalk[exec_block].end(), 0);
+        std::fill(block_nmwalk[exec_block].begin(), block_nmwalk[exec_block].end(), 0);
         ftruncate(block_desc[exec_block], 0);
         global_blocks->reset_rank(exec_block);
+
+        /* clear the in-memory walks */
+        for(tid_t t = 0; t < nthreads; t++) {
+            block_walks[t][exec_block].clear();
+        }
     }
 
     bool test_finished_walks() {
@@ -133,19 +179,5 @@ public:
         return this->ncwalks(cache) == 0;
     }
 };
-
-walk_t walk_encode(hid_t hop, vid_t curr, vid_t source) {
-    walk_t walk;
-    walk.hop   = hop;
-    walk.pos    = curr & 0xffffff;
-    walk.source = source & 0xffffff;
-    return walk;
-}
-
-walk_t walk_recode(walk_t walk, hid_t hop, vid_t curr) {
-    walk.hop = hop;
-    walk.pos  = curr & 0xffffff;
-    return walk;
-}
 
 #endif

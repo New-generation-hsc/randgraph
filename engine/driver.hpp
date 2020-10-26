@@ -3,6 +3,8 @@
 
 #include "cache.hpp"
 #include "util/io.hpp"
+#include "api/graph_buffer.hpp"
+#include "api/types.hpp"
 
 /** graph_driver
  * This file contribute to define the operations of how to read from disk

@@ -13,7 +13,7 @@ public:
     graph_walk   *walk_mangager;
     graph_driver *driver;
     graph_config *conf;
-    timer_t      timer;
+    graph_timer      timer;
 
     graph_engine(graph_cache& _cache, graph_walk& mangager, graph_driver& _driver, graph_config& _conf) {
         cache         = &_cache;
@@ -23,6 +23,7 @@ public:
     }
 
     void prologue(randomwalk_t& userprogram) {
+        logstream(LOG_INFO) << "  =================  STARTED  ======================  " << std::endl;
         logstream(LOG_INFO) << "Random walks, random generate " << userprogram.get_numsources() << " walks on whole graph." << std::endl;
         srand(time(0));
         tid_t exec_threads = conf->nthreads;
@@ -38,9 +39,14 @@ public:
                 walk_mangager->move_walk(walk, blk, omp_get_thread_num(), s, userprogram.get_hops());
             }
         }
+
+        for(bid_t blk = 0; blk < walk_mangager->global_blocks->nblocks; blk++) {
+            logstream(LOG_DEBUG) << "block walks [ " << blk << " ]  = " << walk_mangager->nblockwalks(blk) << std::endl;
+        }
     }
 
     void run(randomwalk_t& userprogram, scheduler& block_scheduler) {
+        logstream(LOG_DEBUG) << "graph blocks : " << walk_mangager->global_blocks->nblocks << ", memory blocks : " << cache->ncblock << std::endl;
         logstream(LOG_INFO) << "Random walks start executing, please wait for a minute." << std::endl;
         timer.start_time();
         int run_count = 0;
@@ -59,6 +65,8 @@ public:
                 if(nwalks == 0) continue; // if no walks, no need to load walkers
                 walk_mangager->load_walks(exec_block);
 
+                logstream(LOG_INFO) << "num of running block : " << cache->nrblock << ", exec_block : " << exec_block << ", num of walks : " << nwalks << std::endl; 
+
                 if(run_count % 100 == 0) 
                 {
                     logstream(LOG_DEBUG) << timer.runtime() << "s : run count : " << run_count << std::endl;
@@ -66,7 +74,7 @@ public:
                 }
 
                 exec_block_walk(userprogram, nwalks, run_block);
-                walk_mangager->cleanup(exec_block);
+                walk_mangager->dump_walks(exec_block);
             }
         }
         logstream(LOG_DEBUG) << timer.runtime() << "s, total run count : " << run_count << std::endl;

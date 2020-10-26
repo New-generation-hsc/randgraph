@@ -70,7 +70,7 @@ public:
     }
 
     void set_size(size_t _size) {
-        this->size = _size;
+        this->bsize = _size;
     }
 };
 
