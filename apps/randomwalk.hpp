@@ -51,6 +51,9 @@ public:
     bool test_finished(graph_walk & walk_mangager) {
         return walk_mangager.nwalks() == 0;
     }
+
+    wid_t get_numsources() { return numsources; }
+    hid_t get_hops() { return steps; }
 };
 
 #endif

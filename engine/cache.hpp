@@ -132,9 +132,11 @@ public:
 class graph_cache {
 public:
     bid_t ncblock;                  /* number of cache blocks */
+    bid_t nrblock;                  /* number of cache blocks are used for running */
     std::vector<cache_block> cache_blocks; /* the cached blocks */
 
     graph_cache(size_t blocksize = BLOCK_SIZE) { 
+        nrblock = 0;
         setup(blocksize);
     }
 
@@ -142,10 +144,6 @@ public:
         ncblock = MEMORY_CACHE / blocksize;
         assert(ncblock > 0);
         cache_blocks.resize(ncblock);
-    }
-
-    void schedule(scheduler & policy) {
-        policy.schedule(*this);
     }
 };
 

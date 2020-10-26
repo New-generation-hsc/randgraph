@@ -41,7 +41,7 @@ public:
         block_desc.resize(global_blocks->nblocks);
         for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) { 
             std::string walk_name = get_walk_name(conf.base_name, blk);
-            block_desc[blk] = open(walk_name.c_str(), O_WRONLY | O_CREAT | O_APPEND, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
+            block_desc[blk] = open(walk_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
         }
         
         block_walks = (graph_buffer<walk_t> **)malloc(nthreads * sizeof(graph_buffer<wid_t> *));
@@ -53,6 +53,20 @@ public:
         }
 
         global_driver = &driver;
+    }
+
+    ~graph_walk() {
+        for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
+            close(block_desc[blk]);
+        }
+
+        for(tid_t tid = 0; tid < nthreads; tid++) {
+            for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
+                block_walks[tid][blk].destroy();
+            }
+           free(block_walks[tid]);
+        }
+        free(block_walks);
     }
 
     void move_walk(walk_t oldwalk, bid_t blk, tid_t t, vid_t dst, hid_t hop) {
@@ -80,6 +94,19 @@ public:
         return walksum;
     }
 
+    wid_t ncwalks(graph_cache *cache) {
+        wid_t walk_sum = 0;
+        for(bid_t p = 0; p < cache->nrblock; p++) {
+            bid_t blk = cache->cache_blocks[p].block->blk;
+            walk_sum += this->block_nmwalk[blk] + this->block_ndwalk[blk];
+        }
+        return walk_sum;
+    }
+
+    wid_t nblockwalks(bid_t blk) {
+        return block_nmwalk[blk] + block_ndwalk[blk];
+    }
+
     void load_walks(bid_t exec_block) {
         wid_t walk_count = block_nmwalk[exec_block] + block_ndwalk[exec_block];
         walks.alloc(walk_count);
@@ -89,6 +116,21 @@ public:
     void dump_walks(bid_t exec_block) {
         global_driver->dump_walk(block_desc[exec_block], walks);
         walks.destroy();
+    }
+
+    void cleanup(bid_t exec_block) {
+        block_ndwalk[exec_block] = 0;
+        block_nmwalk[exec_block] = 0;
+        ftruncate(block_desc[exec_block], 0);
+        global_blocks->reset_rank(exec_block);
+    }
+
+    bool test_finished_walks() {
+        return this->nwalks() == 0;
+    }
+
+    bool test_finished_cache_walks(graph_cache *cache) {
+        return this->ncwalks(cache) == 0;
     }
 };
 

@@ -9,6 +9,6 @@ int main(int argc, char* argv[]) {
     // convert(input, converter);
     // split_blocks(output, 0, BLOCK_SIZE);
     compute_graph_degree_ratio(output, 0, BLOCK_SIZE);
-    logstream(LOG_INFO) << "  ================= FINISHED ======================  " << std::endl;
+    
     return 0;
 }

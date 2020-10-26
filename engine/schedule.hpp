@@ -29,7 +29,7 @@ protected:
 
 public:
     virtual ~scheduler() { }
-    virtual void schedule(graph_cache& cache) = 0;
+    virtual void schedule(graph_cache& cache, graph_driver& driver) = 0;
 
 };
 
@@ -65,6 +65,8 @@ public:
             driver.load_block_degree(degdesc, cache.cache_blocks[blk].degree, global_blocks->blocks[p]);
             driver.load_block_edge(edgedesc,  cache.cache_blocks[blk].csr,    global_blocks->blocks[p]);
         }
+
+        cache.nrblock = blocks.size();
 
         for(; blk < cache.ncblock; blk++) {
             if(cache.cache_blocks[blk].block) {
