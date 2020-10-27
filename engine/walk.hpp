@@ -59,11 +59,11 @@ public:
             block_desc[blk] = open(walk_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
         }
         
-        block_walks = (graph_buffer<walk_t> **)malloc(nthreads * sizeof(graph_buffer<wid_t> *));
-        for(tid_t tid = 0; tid < nthreads; tid++) {
-            block_walks[tid] = (graph_buffer<walk_t> *)malloc(global_blocks->nblocks * sizeof(graph_buffer<walk_t>));
-            for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
-                block_walks[tid][blk].alloc(MAX_TWALKS);
+        block_walks = (graph_buffer<walk_t> **)malloc(global_blocks->nblocks * sizeof(graph_buffer<wid_t> *));
+        for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
+            block_walks[blk] = (graph_buffer<walk_t> *)malloc(nthreads * sizeof(graph_buffer<walk_t>));
+            for(tid_t tid = 0; tid < nthreads; tid++) {
+                block_walks[blk][tid].alloc(MAX_TWALKS);
             }
         }
 
@@ -75,11 +75,11 @@ public:
             close(block_desc[blk]);
         }
 
-        for(tid_t tid = 0; tid < nthreads; tid++) {
-            for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
-                block_walks[tid][blk].destroy();
+        for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
+            for(tid_t tid = 0; tid < nthreads; tid++) {
+                block_walks[blk][tid].destroy();
             }
-           free(block_walks[tid]);
+           free(block_walks[blk]);
         }
         free(block_walks);
     }
@@ -87,18 +87,18 @@ public:
     void move_walk(walk_t oldwalk, bid_t blk, tid_t t, vid_t dst, hid_t hop) {
         block_nmwalk[blk][t] += 1;
         walk_t newwalk = walk_recode(oldwalk, hop, dst);
-        block_walks[t][blk].push_back(newwalk);
+        block_walks[blk][t].push_back(newwalk);
         global_blocks->update_rank(dst);
-        if(block_walks[t][blk].full()) {
+        if(block_walks[blk][t].full()) {
             persistent_walks(t, blk);
         }
     }
 
     void persistent_walks(tid_t t, bid_t blk) {
-        global_driver->dump_walk(block_desc[blk], block_walks[t][blk]);
-        block_ndwalk[blk][t] += block_walks[t][blk].size();
-        block_nmwalk[blk][t] -= block_walks[t][blk].size();
-        block_walks[t][blk].clear();
+        block_ndwalk[blk][t] += block_walks[blk][t].size();
+        block_nmwalk[blk][t] -= block_walks[blk][t].size();
+        global_driver->dump_walk(block_desc[blk], block_walks[blk][t]);
+        block_walks[blk][t].clear();
     }
 
     wid_t nwalks() {
@@ -149,12 +149,11 @@ public:
         
         /** load the in-memory */
         for(tid_t t = 0; t < nthreads; t++) {
-            if(block_walks[t][exec_block].empty()) continue;
-            for(wid_t w = 0; w < block_walks[t][exec_block].size(); w++) {
-                walks.push_back(block_walks[t][exec_block][w]);
+            if(block_walks[exec_block][t].empty()) continue;
+            for(wid_t w = 0; w < block_walks[exec_block][t].size(); w++) {
+                walks.push_back(block_walks[exec_block][t][w]);
             }
         }
-
         assert(walks.size() == mwalk_count + dwalk_count);
     }
 
@@ -167,7 +166,7 @@ public:
 
         /* clear the in-memory walks */
         for(tid_t t = 0; t < nthreads; t++) {
-            block_walks[t][exec_block].clear();
+            block_walks[exec_block][t].clear();
         }
     }
 

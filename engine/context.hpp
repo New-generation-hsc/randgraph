@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <ctime>
 #include "api/types.hpp"
+#include "logger/logger.hpp"
 
 /** graph context
  * 
@@ -36,7 +37,8 @@ public:
     vid_t transition() { 
         eid_t deg = (eid_t)(adj_end - adj_start);
         if(deg > 0 && (float)rand() / RAND_MAX > teleport) {
-            return this->adj_start[(vid_t)rand() % deg];
+            vid_t off = (vid_t)rand() % deg;
+            return this->adj_start[off];
         }else {
             return rand() % nvertices;
         }

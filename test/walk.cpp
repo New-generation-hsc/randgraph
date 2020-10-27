@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
         base_name,
         0,
         BLOCK_SIZE,
-        (tid_t)omp_get_num_threads(),
+        (tid_t)omp_get_max_threads(),
         nvertices,
         nedges
     };

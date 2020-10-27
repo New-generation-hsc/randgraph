@@ -59,10 +59,10 @@ public:
             bid_t p = blocks[blk];
             global_blocks->blocks[p].status = ACTIVE;
             cache.cache_blocks[blk].block  = &global_blocks->blocks[p];
-            cache.cache_blocks[blk].degree = (vid_t*)realloc(cache.cache_blocks[blk].degree, global_blocks->blocks[p].nverts * sizeof(vid_t));
-            cache.cache_blocks[blk].csr    = (vid_t*)realloc(cache.cache_blocks[blk].csr   , global_blocks->blocks[p].nedges * sizeof(vid_t));
+            cache.cache_blocks[blk].beg_pos = (eid_t*)realloc(cache.cache_blocks[blk].beg_pos, (global_blocks->blocks[p].nverts + 1) * sizeof(eid_t));
+            cache.cache_blocks[blk].csr     = (vid_t*)realloc(cache.cache_blocks[blk].csr   , global_blocks->blocks[p].nedges * sizeof(vid_t));
 
-            driver.load_block_degree(degdesc, cache.cache_blocks[blk].degree, global_blocks->blocks[p]);
+            driver.load_block_vertex(vertdesc, cache.cache_blocks[blk].beg_pos, global_blocks->blocks[p]);
             driver.load_block_edge(edgedesc,  cache.cache_blocks[blk].csr,    global_blocks->blocks[p]);
         }
 

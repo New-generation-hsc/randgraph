@@ -107,6 +107,9 @@ public:
             blocks[blk].nedges     = eblocks[blk+1] - eblocks[blk];
             blocks[blk].status     = INACTIVE;
             blocks[blk].rank       = 0;
+
+            logstream(LOG_INFO) << "blk [ " << blk << " ] : vert = [ " << blocks[blk].start_vert << ", " << blocks[blk].start_vert + blocks[blk].nverts << " ], csr = [ ";
+            logstream(LOG_INFO) << blocks[blk].start_edge << ", " << blocks[blk].start_edge + blocks[blk].nedges << " ]" << std::endl;
         }
     }
 
@@ -129,7 +132,7 @@ public:
     bid_t get_block(vid_t v) {
         bid_t blk = 0;
         for(; blk < nblocks; blk++) { 
-            if(v < blocks[blk+1].start_vert) return blk;
+            if(v < blocks[blk].start_vert + blocks[blk].nverts) return blk;
         }
         return nblocks;
     }

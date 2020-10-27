@@ -16,15 +16,15 @@ public:
     graph_driver() { }
     
     void load_block_vertex(int fd, eid_t *buf, const block_t &block) { 
-        load_block_range(fd, buf, block.nverts + 1, block.start_vert);
+        load_block_range(fd, buf, block.nverts + 1, block.start_vert * sizeof(eid_t));
     }
 
     void load_block_degree(int fd, vid_t *buf, const block_t &block) { 
-        load_block_range(fd, buf, block.nverts, block.start_vert);
+        load_block_range(fd, buf, block.nverts, block.start_vert * sizeof(vid_t));
     }
 
     void load_block_edge(int fd, vid_t *buf, const block_t &block) {
-        load_block_range(fd, buf, block.nedges, block.start_edge);
+        load_block_range(fd, buf, block.nedges, block.start_edge * sizeof(vid_t));
     }
 
     void load_walk(int fd, size_t cnt, graph_buffer<walk_t> &walks) {
