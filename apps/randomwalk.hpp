@@ -41,6 +41,7 @@ public:
             bid_t blk = walk_manager->global_blocks->get_block(dst);
             assert(blk < walk_manager->global_blocks->nblocks);
             walk_manager->move_walk(walk, blk, tid, dst, hop);
+            walk_manager->set_max_hop(blk, hop);
         }
     }
 

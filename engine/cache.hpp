@@ -141,11 +141,9 @@ public:
 class graph_cache {
 public:
     bid_t ncblock;                  /* number of cache blocks */
-    bid_t nrblock;                  /* number of cache blocks are used for running */
     std::vector<cache_block> cache_blocks; /* the cached blocks */
 
     graph_cache(bid_t nblocks, size_t blocksize = BLOCK_SIZE) { 
-        nrblock = 0;
         setup(nblocks, blocksize);
     }
 
@@ -153,6 +151,16 @@ public:
         ncblock = min_value(nblocks, MEMORY_CACHE / blocksize);
         assert(ncblock > 0);
         cache_blocks.resize(ncblock);
+    }
+
+    bool test_block_cached(bid_t blk, bid_t &exec_blk) {
+        for(bid_t p = 0; p < ncblock; p++) {
+            if(cache_blocks[p].block != NULL && cache_blocks[p].block->blk == blk) {
+                exec_blk = p;
+                return true;
+            }
+        }
+        return false;
     }
 };
 

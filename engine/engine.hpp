@@ -52,28 +52,25 @@ public:
         timer.start_time();
         int run_count = 0;
         while(!walk_mangager->test_finished_walks()) {
-            block_scheduler.schedule(*cache, *driver);
-            bid_t exec_idx = 0;
-            while(!walk_mangager->test_finished_cache_walks(cache)) {
-                run_count++;
-                exec_block = cache->cache_blocks[exec_idx].block->blk;
-                cache_block *run_block  = &cache->cache_blocks[exec_idx];
-                exec_idx++;
-                if(exec_idx >= cache->nrblock) exec_idx = 0;
+            run_count++;
+            bid_t exec_idx = block_scheduler.schedule(*cache, *driver, *walk_mangager);
+            exec_block = cache->cache_blocks[exec_idx].block->blk;
+            cache_block *run_block  = &cache->cache_blocks[exec_idx];
+            run_block->block->status = USING;
 
-                /* load `exec_block` walks into memory */
-                wid_t nwalks = walk_mangager->nblockwalks(exec_block);
-                if(nwalks == 0) continue; // if no walks, no need to load walkers
-                walk_mangager->load_walks(exec_block);
+            /* load `exec_block` walks into memory */
+            wid_t nwalks = walk_mangager->nblockwalks(exec_block);
+            if(nwalks == 0) continue; // if no walks, no need to load walkers
+            walk_mangager->load_walks(exec_block);
 
-                if(run_count % 100 == 0) 
-                {
-                    logstream(LOG_DEBUG) << timer.runtime() << "s : run count : " << run_count << std::endl;
-                    logstream(LOG_INFO) << "exec_block : " << exec_block << ", walk num : " << nwalks << std::endl;
-                }
-                exec_block_walk(userprogram, nwalks, run_block);
-                walk_mangager->dump_walks(exec_block);
+            if(run_count % 100 == 0) 
+            {
+                logstream(LOG_DEBUG) << timer.runtime() << "s : run count : " << run_count << std::endl;
+                logstream(LOG_INFO) << "exec_block : " << exec_block << ", walk num : " << nwalks << std::endl;
             }
+            exec_block_walk(userprogram, nwalks, run_block);
+            walk_mangager->dump_walks(exec_block);
+            run_block->block->status = USED;
         }
         logstream(LOG_DEBUG) << timer.runtime() << "s, total run count : " << run_count << std::endl;
     }

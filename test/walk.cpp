@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
 
     graph_block blocks(&conf);
     graph_driver driver;
-    graph_scheduler block_scheduler(&conf, blocks);
+    walk_schedule_t block_scheduler(&conf, 0.2);
     graph_walk walk_mangager(conf, blocks, driver);
     graph_cache cache(blocks.nblocks, conf.blocksize);
     

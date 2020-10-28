@@ -27,6 +27,7 @@ public:
     tid_t nthreads;     /* number of threads */
     graph_block *global_blocks;
 
+    std::vector<hid_t> maxhops;   /* record the block has at least `maxhops` to finished */
     std::vector<std::vector<wid_t>>     block_nmwalk;  /* record each block number of walks in memroy */
     std::vector<std::vector<wid_t>>     block_ndwalk;  /* record each block number of walks in disk */
     std::vector<int>       block_desc;     /* the descriptor of each block walk file */
@@ -40,6 +41,8 @@ public:
         nedges    = conf.nedges;
         nthreads = conf.nthreads;
         global_blocks = &blocks;
+
+        maxhops.resize(global_blocks->nblocks, 0);
 
         block_nmwalk.resize(global_blocks->nblocks);
         for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
@@ -111,9 +114,11 @@ public:
 
     wid_t ncwalks(graph_cache *cache) {
         wid_t walk_sum = 0;
-        for(bid_t p = 0; p < cache->nrblock; p++) {
-            bid_t blk = cache->cache_blocks[p].block->blk;
-            walk_sum += this->nblockwalks(blk);
+        for(bid_t p = 0; p < cache->ncblock; p++) {
+            if(cache->cache_blocks[p].block != NULL && cache->cache_blocks[p].block->status != INACTIVE) {
+                bid_t blk = cache->cache_blocks[p].block->blk;
+                walk_sum += this->nblockwalks(blk);
+            }
         }
         return walk_sum;
     }
@@ -176,6 +181,45 @@ public:
 
     bool test_finished_cache_walks(graph_cache *cache) {
         return this->ncwalks(cache) == 0;
+    }
+
+    bid_t max_walks_block() {
+        wid_t max_walks = 0;
+        bid_t blk = 0;
+        for(bid_t p = 0; p < global_blocks->nblocks; p++) {
+            wid_t walk_cnt = this->nblockwalks(p);
+            if(max_walks < walk_cnt) {
+                max_walks = walk_cnt;
+                blk = p;
+            }
+        }
+        return blk;
+    }
+
+    void set_max_hop(bid_t blk, hid_t hop) {
+        #pragma omp critical
+        {
+            if(maxhops[blk] < hop) maxhops[blk] = hop;
+        }
+    }
+
+    bid_t max_hops_block() { 
+        hid_t walk_hop = 0;
+        bid_t blk = 0;
+        for(bid_t p = 0; p < global_blocks->nblocks; p++) {
+            if(maxhops[p] > walk_hop) {
+                walk_hop = maxhops[p];
+                blk = p;
+            }
+        }
+        if(walk_hop == 0) return max_walks_block();
+        return blk;
+    }
+
+    bid_t choose_block(float prob) {
+        float cc = (float)rand() / RAND_MAX;
+        if(cc < prob) return max_hops_block();
+        else return max_walks_block();
     }
 };
 

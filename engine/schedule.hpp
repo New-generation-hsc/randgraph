@@ -9,6 +9,7 @@
 #include "cache.hpp"
 #include "config.hpp"
 #include "driver.hpp"
+#include "walk.hpp"
 #include "util/util.hpp"
 #include "util/io.hpp"
 
@@ -25,21 +26,10 @@ struct rank_compare {
 
 class scheduler {
 protected:
-    graph_block *global_blocks;
-
-public:
-    virtual ~scheduler() { }
-    virtual void schedule(graph_cache& cache, graph_driver& driver) = 0;
-
-};
-
-class graph_scheduler : public scheduler {
-private:
     int vertdesc, edgedesc, degdesc;  /* the beg_pos, csr, degree file descriptor */
 
 public:
-    graph_scheduler(graph_config *conf, graph_block& blocks) {
-        
+    scheduler(graph_config *conf) {
         std::string beg_pos_name    = get_beg_pos_name(conf->base_name, conf->fnum);
         std::string csr_name        = get_csr_name(conf->base_name, conf->fnum);
         std::string degree_name     = get_degree_name(conf->base_name, conf->fnum);
@@ -47,18 +37,51 @@ public:
         vertdesc = open(beg_pos_name.c_str(), O_RDONLY);
         edgedesc = open(csr_name.c_str(), O_RDONLY);
         degdesc  = open(degree_name.c_str(), O_RDONLY);
+    }
+    ~scheduler() { 
+        close(vertdesc);
+        close(edgedesc);
+        close(degdesc);
+    }
+    virtual bid_t schedule(graph_cache& cache, graph_driver& driver, graph_walk &walk_manager) = 0;
 
-        global_blocks = &blocks;
+};
+
+class graph_scheduler : public scheduler {
+private:
+    bid_t exec_blk;                   /* the current cache block index used for run */
+    bid_t nrblock;                    /* number of cache blocks are used for running */
+public:
+    graph_scheduler(graph_config *conf) : scheduler(conf) {
+        exec_blk = 0;
+        nrblock  = 0;
     }
 
     /** If the cache block has no walk, then swap out all blocks */
-    void schedule(graph_cache& cache, graph_driver& driver) { 
+    bid_t schedule(graph_cache& cache, graph_driver& driver, graph_walk &walk_manager) { 
+        if(walk_manager.test_finished_cache_walks(&cache)) {
+            swap_blocks(cache, driver, walk_manager.global_blocks);
+        }
+        bid_t ret = exec_blk;
+        exec_blk++;
+        if(exec_blk >= nrblock) exec_blk = 0;
+        return ret;
+    }
+
+    void swap_blocks(graph_cache& cache, graph_driver& driver, graph_block* global_blocks) { 
+        // set the all cached blocks inactive */
+        for(bid_t p = 0; p < cache.ncblock; p++) {
+            if(cache.cache_blocks[p].block != NULL) {
+                cache.cache_blocks[p].block->status = INACTIVE;
+            }
+        }
+
         bid_t blk = 0;
-        std::vector<bid_t> blocks = choose_blocks(cache.ncblock);
+        std::vector<bid_t> blocks = choose_blocks(cache.ncblock, global_blocks);
         for(; blk < blocks.size(); blk++) {
             bid_t p = blocks[blk];
-            global_blocks->blocks[p].status = ACTIVE;
             cache.cache_blocks[blk].block  = &global_blocks->blocks[p];
+            cache.cache_blocks[blk].block->status = ACTIVE;
             cache.cache_blocks[blk].beg_pos = (eid_t*)realloc(cache.cache_blocks[blk].beg_pos, (global_blocks->blocks[p].nverts + 1) * sizeof(eid_t));
             cache.cache_blocks[blk].csr     = (vid_t*)realloc(cache.cache_blocks[blk].csr   , global_blocks->blocks[p].nedges * sizeof(vid_t));
 
@@ -66,16 +89,17 @@ public:
             driver.load_block_edge(edgedesc,  cache.cache_blocks[blk].csr,    global_blocks->blocks[p]);
         }
 
-        cache.nrblock = blocks.size();
+        nrblock = blocks.size();
+        exec_blk = 0;
 
         for(; blk < cache.ncblock; blk++) {
             if(cache.cache_blocks[blk].block) {
-                cache.cache_blocks[blk].block->status = INACTIVE;
+                cache.cache_blocks[blk].block = NULL;
             }
         }
     }
 
-    std::vector<bid_t> choose_blocks(bid_t ncblocks) { 
+    std::vector<bid_t> choose_blocks(bid_t ncblocks, graph_block* global_blocks) { 
         std::vector<bid_t> blocks;
         std::priority_queue<std::pair<bid_t, rank_t>, std::vector<std::pair<bid_t, rank_t>>, rank_compare> pq;
         for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) { 
@@ -92,6 +116,55 @@ public:
         std::sort(blocks.begin(), blocks.end());
 
         return blocks;
+    }
+};
+
+
+/**
+ * The following schedule scheme follow the graph walker scheme
+ */
+class walk_schedule_t : public scheduler {
+private:
+    float prob;
+    bid_t exec_blk;
+public:
+    walk_schedule_t(graph_config* conf, float p) : scheduler(conf) {
+        // nothing need to initialize
+        prob = p;
+        exec_blk = 0;
+    }
+
+    bid_t schedule(graph_cache& cache, graph_driver& driver, graph_walk &walk_manager) {
+        bid_t blk = walk_manager.choose_block(prob);
+        if(cache.test_block_cached(blk, exec_blk)) {
+            return exec_blk;
+        }
+        graph_block *global_blocks = walk_manager.global_blocks;
+        exec_blk = swap_block(cache, walk_manager);
+        cache.cache_blocks[exec_blk].block = &global_blocks->blocks[blk];
+        cache.cache_blocks[exec_blk].block->status = ACTIVE;
+
+        cache.cache_blocks[exec_blk].beg_pos = (eid_t*)realloc(cache.cache_blocks[exec_blk].beg_pos, (global_blocks->blocks[blk].nverts + 1) * sizeof(eid_t));
+        cache.cache_blocks[exec_blk].csr     = (vid_t*)realloc(cache.cache_blocks[exec_blk].csr   , global_blocks->blocks[blk].nedges * sizeof(vid_t));
+
+        driver.load_block_vertex(vertdesc, cache.cache_blocks[exec_blk].beg_pos, global_blocks->blocks[blk]);
+        driver.load_block_edge(edgedesc,  cache.cache_blocks[exec_blk].csr,    global_blocks->blocks[blk]);
+        return exec_blk;
+    }
+
+    bid_t swap_block(graph_cache& cache, graph_walk &walk_mangager) {
+        wid_t walks_cnt = 0xffffffff;
+        bid_t blk = 0;
+        for(bid_t p = 0; p < cache.ncblock; p++) {
+            if(cache.cache_blocks[p].block == NULL) return p;
+            wid_t cnt = walk_mangager.nblockwalks(cache.cache_blocks[p].block->blk);
+            if(walks_cnt > cnt) {
+                walks_cnt = cnt;
+                blk = p;
+            }
+        }
+        cache.cache_blocks[blk].block->status = INACTIVE;
+        return blk;
     }
 };
 
