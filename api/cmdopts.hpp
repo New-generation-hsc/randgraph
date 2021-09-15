@@ -164,10 +164,6 @@
         return val;
     }
     
-    
-    
-    
-    
     static int VARIABLE_IS_NOT_USED get_option_int(const char *option_name, int default_value)
     {
         int i;
@@ -193,8 +189,6 @@
 
     }
 
-    
-    
     static uint64_t VARIABLE_IS_NOT_USED get_option_long(const char *option_name, uint64_t default_value)
     {
         int i;
@@ -215,6 +209,18 @@
             if (strcmp(_argv[i], option_name) == 0)
                 return (float)atof(_argv[i + 1]);
         return (float) get_config_option_double(option_name, default_value);
+    }
+
+
+    static bool VARIABLE_IS_NOT_USED get_option_bool(const char *option_name) 
+    {
+        int i;
+        check_cmd_init();
+
+        for (i = _argc - 1; i >= 0; i -= 1)
+            if (strcmp(_argv[i], option_name) == 0)
+                return true;
+        return false;
     }
 
 

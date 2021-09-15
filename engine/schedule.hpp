@@ -12,6 +12,7 @@
 #include "walk.hpp"
 #include "util/util.hpp"
 #include "util/io.hpp"
+#include "metrics/metrics.hpp"
 
 struct rank_compare {
     bool operator()(const std::pair<bid_t, rank_t>& p1, const std::pair<bid_t, rank_t>& p2) {
@@ -27,9 +28,10 @@ struct rank_compare {
 class scheduler {
 protected:
     int vertdesc, edgedesc, degdesc;  /* the beg_pos, csr, degree file descriptor */
+    metrics &_m;
 
 public:
-    scheduler(graph_config *conf) {
+    scheduler(graph_config *conf, metrics& m) : _m(m) {
         std::string beg_pos_name    = get_beg_pos_name(conf->base_name, conf->fnum);
         std::string csr_name        = get_csr_name(conf->base_name, conf->fnum);
         std::string degree_name     = get_degree_name(conf->base_name, conf->fnum);
@@ -52,7 +54,7 @@ private:
     bid_t exec_blk;                   /* the current cache block index used for run */
     bid_t nrblock;                    /* number of cache blocks are used for running */
 public:
-    graph_scheduler(graph_config *conf) : scheduler(conf) {
+    graph_scheduler(graph_config *conf, metrics &m) : scheduler(conf, m) {
         exec_blk = 0;
         nrblock  = 0;
     }
@@ -70,6 +72,7 @@ public:
 
     void swap_blocks(graph_cache& cache, graph_driver& driver, graph_block* global_blocks) { 
         // set the all cached blocks inactive */
+        _m.start_time("graph_scheduler_swap_blocks");
         for(bid_t p = 0; p < cache.ncblock; p++) {
             if(cache.cache_blocks[p].block != NULL) {
                 cache.cache_blocks[p].block->status = INACTIVE;
@@ -97,6 +100,7 @@ public:
                 cache.cache_blocks[blk].block = NULL;
             }
         }
+        _m.stop_time("graph_scheduler_swap_blocks");
     }
 
     std::vector<bid_t> choose_blocks(bid_t ncblocks, graph_block* global_blocks) { 
@@ -128,7 +132,7 @@ private:
     float prob;
     bid_t exec_blk;
 public:
-    walk_schedule_t(graph_config* conf, float p) : scheduler(conf) {
+    walk_schedule_t(graph_config* conf, float p, metrics &m) : scheduler(conf, m) {
         // nothing need to initialize
         prob = p;
         exec_blk = 0;
@@ -139,6 +143,7 @@ public:
         if(cache.test_block_cached(blk, exec_blk)) {
             return exec_blk;
         }
+        _m.start_time("walk_schedule_swap_blocks");
         graph_block *global_blocks = walk_manager.global_blocks;
         exec_blk = swap_block(cache, walk_manager);
         cache.cache_blocks[exec_blk].block = &global_blocks->blocks[blk];
@@ -149,6 +154,7 @@ public:
 
         driver.load_block_vertex(vertdesc, cache.cache_blocks[exec_blk].beg_pos, global_blocks->blocks[blk]);
         driver.load_block_edge(edgedesc,  cache.cache_blocks[exec_blk].csr,    global_blocks->blocks[blk]);
+        _m.stop_time("walk_schedule_swap_blocks");
         return exec_blk;
     }
 

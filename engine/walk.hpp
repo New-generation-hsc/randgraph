@@ -168,6 +168,7 @@ public:
         std::fill(block_nmwalk[exec_block].begin(), block_nmwalk[exec_block].end(), 0);
         ftruncate(block_desc[exec_block], 0);
         global_blocks->reset_rank(exec_block);
+        maxhops[exec_block] = 0;
 
         /* clear the in-memory walks */
         for(tid_t t = 0; t < nthreads; t++) {

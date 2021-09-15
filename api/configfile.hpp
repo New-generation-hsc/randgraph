@@ -84,7 +84,7 @@
             f = fopen(secondary_filename.c_str(), "r");
             if (f == NULL) {
                 std::cout << "ERROR: Could not read configuration file: " << filename << std::endl;
-                std::cout << "Please define environment variable GRAPHCHI_ROOT or run the program from that directory." << std::endl;
+                std::cout << "Please define environment variable RANDGRAPH_ROOT or run the program from that directory." << std::endl;
             }
             assert(f != NULL);
         }

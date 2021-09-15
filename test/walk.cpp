@@ -9,9 +9,12 @@
 #include "util/io.hpp"
 #include "util/util.hpp"
 #include "apps/randomwalk.hpp"
+#include "metrics/metrics.hpp"
+#include "metrics/reporter.hpp"
 
-int main(int argc, char* argv[]) {
+int main(int argc, const char* argv[]) {
     assert(argc >= 2);
+    set_argc(argc, argv);
     logstream(LOG_INFO) << "app : " << argv[0] << ", dataset : " << argv[1] << std::endl;
     std::string input = argv[1];
     std::string base_name = remove_extension(input);
@@ -32,16 +35,23 @@ int main(int argc, char* argv[]) {
 
     graph_block blocks(&conf);
     graph_driver driver;
-    graph_scheduler block_scheduler(&conf);
+    metrics m("randomwalk");
+    bool is_walk_schedule = get_option_bool("-w");
+    graph_scheduler block_scheduler(&conf, m);
+    walk_schedule_t walk_scheduler(&conf, 0.2, m);
+
     graph_walk walk_mangager(conf, blocks, driver);
     graph_cache cache(blocks.nblocks, conf.blocksize);
     
     randomwalk_t userprogram(100000, 25, 0.15);
-    graph_engine engine(cache, walk_mangager, driver, conf);
+    graph_engine engine(cache, walk_mangager, driver, conf, m);
     
     engine.prologue(userprogram);
-    engine.run(userprogram, block_scheduler);
+    if(is_walk_schedule) engine.run(userprogram, walk_scheduler);
+    else engine.run(userprogram, block_scheduler);
     engine.epilogue(userprogram);
+
+    metrics_report(m);
 
     return 0;
 }

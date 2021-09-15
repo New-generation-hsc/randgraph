@@ -5,6 +5,7 @@
 #include "schedule.hpp"
 #include "apps/randomwalk.hpp"
 #include "util/timer.hpp"
+#include "metrics/metrics.hpp"
 
 class graph_engine {
 public:
@@ -15,7 +16,10 @@ public:
     graph_config *conf;
     graph_timer      timer;
 
-    graph_engine(graph_cache& _cache, graph_walk& mangager, graph_driver& _driver, graph_config& _conf) {
+    // statistic metric
+    metrics &_m;
+
+    graph_engine(graph_cache& _cache, graph_walk& mangager, graph_driver& _driver, graph_config& _conf, metrics &m) : _m(m){
         cache         = &_cache;
         walk_mangager = &mangager;
         driver        = &_driver;
@@ -41,9 +45,9 @@ public:
             }
         }
 
-        for(bid_t blk = 0; blk < walk_mangager->global_blocks->nblocks; blk++) {
-            logstream(LOG_INFO) << "block walks [ " << blk << " ]  = " << walk_mangager->nblockwalks(blk) << std::endl;
-        }
+        // for(bid_t blk = 0; blk < walk_mangager->global_blocks->nblocks; blk++) {
+        //     logstream(LOG_INFO) << "block walks [ " << blk << " ]  = " << walk_mangager->nblockwalks(blk) << std::endl;
+        // }
     }
 
     void run(randomwalk_t& userprogram, scheduler& block_scheduler) {
@@ -66,7 +70,7 @@ public:
             if(run_count % 100 == 0) 
             {
                 logstream(LOG_DEBUG) << timer.runtime() << "s : run count : " << run_count << std::endl;
-                logstream(LOG_INFO) << "exec_block : " << exec_block << ", walk num : " << nwalks << std::endl;
+                logstream(LOG_INFO) << "exec_block : " << exec_block << ", walk num : " << nwalks << ", walksum : " << walk_mangager->nwalks() << std::endl;
             }
             exec_block_walk(userprogram, nwalks, run_block);
             walk_mangager->dump_walks(exec_block);

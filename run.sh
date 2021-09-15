@@ -13,4 +13,4 @@ echo "vertices = $VERTICES, steps = $STEPS, length = $LENGTH"
 sudo sync; sudo sh -c '/usr/bin/echo 1 > /proc/sys/vm/drop_caches'
 
 # the random command
-./bin/test/walk $DATASET
+./bin/test/walk $DATASET $1

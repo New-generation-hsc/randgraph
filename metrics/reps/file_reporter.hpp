@@ -63,32 +63,6 @@
           
           for(it = entries.begin(); it != entries.end(); ++it) {
               metrics_entry ent = it->second;
-              // print the statistics --Rui start
-              std::string statistic_filename = filename + ".statistics";
-              std::ofstream ofs;
-              ofs.open(statistic_filename.c_str(), std::ofstream::out | std::ofstream::app );
-              if( it->first == "00_runtime")
-                  ofs << ent.value << "  \t  " ;
-              else if( it->first == "1_chooseBlock")
-                  ofs << ent.value << "  \t  " ;
-              else if( it->first == "2_findSubGraph")
-                  ofs << ent.value << "  \t  " ;
-              else if( it->first == "3_getCurrentWalks")
-                  ofs << ent.value << "  \t  " ;
-              else if( it->first == "4_writeWalks2Disk")
-                  ofs << ent.value << "  \t  " ;
-              else if( it->first == "5_exec_updates")
-                  ofs << ent.value << "  \t  " ;
-              else if( it->first == "6_updateWalkNum"){
-                  ofs << ent.value << "  \t  " ;
-                  ofs << ent.count << "  \t  " ; 
-              }
-              else if( it->first == "g_loadSubGraph"){
-                  ofs << ent.count << "  \t  " ;
-              }
-              else if( it->first == "nblocks" )
-                  ofs << ent.value << std::endl;
-              // Rui end
               switch(ent.valtype) {
                   case INTEGER:
                       
