@@ -32,11 +32,11 @@ int main(int argc, char* argv[]) {
 
     graph_block blocks(&conf);
     graph_driver driver;
-    walk_schedule_t block_scheduler(&conf, 0.2);
+    graph_scheduler block_scheduler(&conf);
     graph_walk walk_mangager(conf, blocks, driver);
     graph_cache cache(blocks.nblocks, conf.blocksize);
     
-    randomwalk_t userprogram(10000, 25, 0.15);
+    randomwalk_t userprogram(100000, 25, 0.15);
     graph_engine engine(cache, walk_mangager, driver, conf);
     
     engine.prologue(userprogram);

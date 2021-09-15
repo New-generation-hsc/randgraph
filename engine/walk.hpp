@@ -59,7 +59,7 @@ public:
         block_desc.resize(global_blocks->nblocks);
         for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) { 
             std::string walk_name = get_walk_name(conf.base_name, blk);
-            block_desc[blk] = open(walk_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
+            block_desc[blk] = open(walk_name.c_str(), O_RDWR | O_CREAT | O_TRUNC | O_APPEND, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
         }
         
         block_walks = (graph_buffer<walk_t> **)malloc(global_blocks->nblocks * sizeof(graph_buffer<wid_t> *));

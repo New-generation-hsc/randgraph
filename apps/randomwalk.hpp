@@ -27,13 +27,14 @@ public:
         vid_t dst = walk.pos;
         hid_t hop = walk.hop;
 
-        srand(time(0));
+        // srand(time(0));
+        unsigned seed = (unsigned)(walk.source + walk.pos + walk.hop + time(NULL));
         vid_t start_vert = cache->block->start_vert, end_vert = cache->block->start_vert + cache->block->nverts;
         while(dst >= start_vert && dst < end_vert && hop > 0) {
             vid_t off = dst - start_vert;
             eid_t adj_head = cache->beg_pos[off] - cache->block->start_edge, adj_tail = cache->beg_pos[off + 1] - cache->block->start_edge;
             graph_context ctx(dst, cache->csr + adj_head, cache->csr + adj_tail, teleport, walk_manager->nvertices);
-            dst = choose_next(ctx);
+            dst = choose_next(ctx, &seed);
             hop--;
         }
 
@@ -45,8 +46,8 @@ public:
         }
     }
 
-    vid_t choose_next(context& ctx) {
-        return ctx.transition();
+    vid_t choose_next(context& ctx, unsigned *seed) {
+        return ctx.transition(seed);
     }
 
     wid_t get_numsources() { return numsources; }

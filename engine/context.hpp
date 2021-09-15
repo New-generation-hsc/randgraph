@@ -13,7 +13,7 @@
 
 class context { 
 public:
-    virtual vid_t transition() {
+    virtual vid_t transition(unsigned *seed) {
         return 0;
     }
 };
@@ -34,13 +34,13 @@ public:
         this->nvertices = _nvertices;
     }
 
-    vid_t transition() { 
+    vid_t transition(unsigned *seed) { 
         eid_t deg = (eid_t)(adj_end - adj_start);
-        if(deg > 0 && (float)rand() / RAND_MAX > teleport) {
-            vid_t off = (vid_t)rand() % deg;
+        if(deg > 0 && (float)rand_r(seed) / RAND_MAX > teleport) {
+            vid_t off = (vid_t)rand_r(seed) % deg;
             return this->adj_start[off];
         }else {
-            return rand() % nvertices;
+            return rand_r(seed) % nvertices;
         }
     }
 };
