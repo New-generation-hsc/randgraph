@@ -28,7 +28,7 @@ public:
 
     void prologue(randomwalk_t& userprogram) {
         logstream(LOG_INFO) << "  =================  STARTED  ======================  " << std::endl;
-        logstream(LOG_INFO) << "Random walks, random generate " << userprogram.get_numsources() << " walks on whole graph." << std::endl;
+        logstream(LOG_INFO) << "Random walks, random generate " << userprogram.get_numsources() << " walks on whole graph, exec_threads = " << conf->nthreads << std::endl;
         logstream(LOG_INFO) << "vertices : " << conf->nvertices << ", edges : " << conf->nedges << std::endl;
         srand(time(0));
         tid_t exec_threads = conf->nthreads;
@@ -40,14 +40,14 @@ public:
             for(wid_t idx = 0; idx < userprogram.get_numsources(); idx++) {
                 vid_t s = rand() % walk_mangager->nvertices;
                 bid_t blk = walk_mangager->global_blocks->get_block(s);
-                walk_t walk = walk_encode(userprogram.get_hops(), s, s);
+                walk_t walk = WALKER_MAKEUP(s, s, userprogram.get_hops());
                 walk_mangager->move_walk(walk, blk, omp_get_thread_num(), s, userprogram.get_hops());
             }
         }
 
-        // for(bid_t blk = 0; blk < walk_mangager->global_blocks->nblocks; blk++) {
-        //     logstream(LOG_INFO) << "block walks [ " << blk << " ]  = " << walk_mangager->nblockwalks(blk) << std::endl;
-        // }
+        for(bid_t blk = 0; blk < walk_mangager->global_blocks->nblocks; blk++) {
+            walk_mangager->set_max_hop(blk, userprogram.get_hops());
+        }
     }
 
     void run(randomwalk_t& userprogram, scheduler& block_scheduler) {
@@ -64,12 +64,14 @@ public:
 
             /* load `exec_block` walks into memory */
             wid_t nwalks = walk_mangager->nblockwalks(exec_block);
-            if(nwalks == 0) continue; // if no walks, no need to load walkers
             walk_mangager->load_walks(exec_block);
 
-            if(run_count % 100 == 0) 
+            vid_t nverts = run_block->block->nverts;
+            eid_t nedges = run_block->block->nedges;
+            if(run_count % (1024*1024*1024 / nedges + 1) == 1)
             {
                 logstream(LOG_DEBUG) << timer.runtime() << "s : run count : " << run_count << std::endl;
+                logstream(LOG_DEBUG) << "nverts = " << nverts << ", nedges = " << nedges << std::endl;
                 logstream(LOG_INFO) << "exec_block : " << exec_block << ", walk num : " << nwalks << ", walksum : " << walk_mangager->nwalks() << std::endl;
             }
             exec_block_walk(userprogram, nwalks, run_block);

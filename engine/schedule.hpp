@@ -161,15 +161,23 @@ public:
     bid_t swap_block(graph_cache& cache, graph_walk &walk_mangager) {
         wid_t walks_cnt = 0xffffffff;
         bid_t blk = 0;
+        int life = -1;
         for(bid_t p = 0; p < cache.ncblock; p++) {
-            if(cache.cache_blocks[p].block == NULL) return p;
+            if(cache.cache_blocks[p].block == NULL) {
+                blk = p; break;
+            }
             wid_t cnt = walk_mangager.nblockwalks(cache.cache_blocks[p].block->blk);
             if(walks_cnt > cnt) {
                 walks_cnt = cnt;
                 blk = p;
+                life = cache.cache_blocks[p].life;
+            }else if(walks_cnt == cnt && cache.cache_blocks[p].life > life) {
+                blk = p;
+                life = cache.cache_blocks[p].life;
             }
+            cache.cache_blocks[p].life += 1;
         }
-        cache.cache_blocks[blk].block->status = INACTIVE;
+        cache.cache_blocks[blk].life = 0;
         return blk;
     }
 };

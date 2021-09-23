@@ -6,20 +6,6 @@
 #include "api/graph_buffer.hpp"
 #include "cache.hpp"
 
-walk_t walk_encode(hid_t hop, vid_t curr, vid_t source) {
-    walk_t walk;
-    walk.hop   = hop;
-    walk.pos    = curr & 0xffffff;
-    walk.source = source & 0xffffff;
-    return walk;
-}
-
-walk_t walk_recode(walk_t walk, hid_t hop, vid_t curr) {
-    walk.hop = hop;
-    walk.pos  = curr & 0xffffff;
-    return walk;
-}
-
 class graph_walk {
 public:
     vid_t nvertices;
@@ -88,13 +74,13 @@ public:
     }
 
     void move_walk(walk_t oldwalk, bid_t blk, tid_t t, vid_t dst, hid_t hop) {
-        block_nmwalk[blk][t] += 1;
-        walk_t newwalk = walk_recode(oldwalk, hop, dst);
-        block_walks[blk][t].push_back(newwalk);
-        global_blocks->update_rank(dst);
-        if(block_walks[blk][t].full()) {
+        if (block_walks[blk][t].full()){
             persistent_walks(t, blk);
         }
+        block_nmwalk[blk][t] += 1;
+        walk_t newwalk = WALKER_MAKEUP(WALKER_SOURCE(oldwalk), dst, hop);
+        block_walks[blk][t].push_back(newwalk);
+        global_blocks->update_rank(dst);
     }
 
     void persistent_walks(tid_t t, bid_t blk) {
@@ -213,7 +199,7 @@ public:
                 blk = p;
             }
         }
-        if(walk_hop == 0) return max_walks_block();
+        if(this->nblockwalks(blk) == 0) return max_walks_block();
         return blk;
     }
 

@@ -24,11 +24,10 @@ public:
 
     void update_walk(walk_t walk, cache_block* cache, graph_walk *walk_manager) {
         tid_t tid = omp_get_thread_num();
-        vid_t dst = walk.pos;
-        hid_t hop = walk.hop;
+        vid_t dst = WALKER_POS(walk);
+        hid_t hop = WALKER_HOP(walk);
 
-        // srand(time(0));
-        unsigned seed = (unsigned)(walk.source + walk.pos + walk.hop + time(NULL));
+        unsigned seed = (unsigned)(dst + hop + tid + time(NULL));
         vid_t start_vert = cache->block->start_vert, end_vert = cache->block->start_vert + cache->block->nverts;
         while(dst >= start_vert && dst < end_vert && hop > 0) {
             vid_t off = dst - start_vert;

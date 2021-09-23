@@ -70,11 +70,17 @@ public:
     vid_t *degree;
     vid_t *csr;
 
+    /**
+     * record each block life, when swap out, the largest life block will be evicted
+     */
+    int life; 
+
     cache_block() {
         block   = NULL;
         beg_pos = NULL;
         degree  = NULL;
         csr     = NULL;
+        life = 0;
     }
 
     ~cache_block() {
