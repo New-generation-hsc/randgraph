@@ -182,4 +182,85 @@ public:
     }
 };
 
+/**
+ * The following schedule scheme follow the traversal scheme
+ */
+class traversal_schedule_t : public scheduler
+{
+private:
+    float prob;
+    bid_t exec_blk, select_blk;
+
+public:
+    traversal_schedule_t(graph_config *conf, float p, metrics &m) : scheduler(conf, m)
+    {
+        // nothing need to initialize
+        prob = p;
+        exec_blk = select_blk = 0;
+    }
+
+    bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk &walk_manager)
+    {
+        while(exec_blk < cache.ncblock && cache.cache_blocks[exec_blk].block != NULL) {
+            if(cache.cache_blocks[exec_blk].block->blk == select_blk) exec_blk++;
+            else {
+                bid_t blk = exec_blk++;
+                return blk;
+            }
+        }
+
+        /** start a new round block traversal */
+        select_blk = walk_manager.choose_block(prob);
+        if (cache.test_block_cached(select_blk, exec_blk))
+        {
+            return exec_blk;
+        }
+        _m.start_time("walk_schedule_swap_blocks");
+        graph_block *global_blocks = walk_manager.global_blocks;
+        exec_blk = swap_block(cache, walk_manager);
+        cache.cache_blocks[exec_blk].block = &global_blocks->blocks[select_blk];
+        cache.cache_blocks[exec_blk].block->status = ACTIVE;
+
+        cache.cache_blocks[exec_blk].beg_pos = (eid_t *)realloc(cache.cache_blocks[exec_blk].beg_pos, (global_blocks->blocks[select_blk].nverts + 1) * sizeof(eid_t));
+        cache.cache_blocks[exec_blk].csr = (vid_t *)realloc(cache.cache_blocks[exec_blk].csr, global_blocks->blocks[select_blk].nedges * sizeof(vid_t));
+
+        driver.load_block_vertex(vertdesc, cache.cache_blocks[exec_blk].beg_pos, global_blocks->blocks[select_blk]);
+        driver.load_block_edge(edgedesc, cache.cache_blocks[exec_blk].csr, global_blocks->blocks[select_blk]);
+        _m.stop_time("walk_schedule_swap_blocks");
+        bid_t blk = exec_blk;
+        exec_blk = 0;
+        return blk;
+    }
+
+    bid_t swap_block(graph_cache &cache, graph_walk &walk_mangager)
+    {
+        wid_t walks_cnt = 0xffffffff;
+        bid_t blk = 0;
+        int life = -1;
+        for (bid_t p = 0; p < cache.ncblock; p++)
+        {
+            if (cache.cache_blocks[p].block == NULL)
+            {
+                blk = p;
+                break;
+            }
+            wid_t cnt = walk_mangager.nblockwalks(cache.cache_blocks[p].block->blk);
+            if (walks_cnt > cnt)
+            {
+                walks_cnt = cnt;
+                blk = p;
+                life = cache.cache_blocks[p].life;
+            }
+            else if (walks_cnt == cnt && cache.cache_blocks[p].life > life)
+            {
+                blk = p;
+                life = cache.cache_blocks[p].life;
+            }
+            cache.cache_blocks[p].life += 1;
+        }
+        cache.cache_blocks[blk].life = 0;
+        return blk;
+    }
+};
+
 #endif

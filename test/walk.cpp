@@ -38,7 +38,7 @@ int main(int argc, const char* argv[]) {
     metrics m("randomwalk");
     bool is_walk_schedule = get_option_bool("-w");
     graph_scheduler block_scheduler(&conf, m);
-    walk_schedule_t walk_scheduler(&conf, 0.2, m);
+    traversal_schedule_t walk_scheduler(&conf, 0.2, m);
 
     graph_walk walk_mangager(conf, blocks, driver);
     graph_cache cache(blocks.nblocks, conf.blocksize);
