@@ -16,8 +16,8 @@ int main(int argc, const char* argv[]) {
     assert(argc >= 2);
     set_argc(argc, argv);
     logstream(LOG_INFO) << "app : " << argv[0] << ", dataset : " << argv[1] << std::endl;
-    std::string input = argv[1];
-    std::string base_name = remove_extension(input);
+    std::string input = remove_extension(argv[1]);
+    std::string base_name = randgraph_output_filename(get_path_name(input), get_file_name(input), BLOCK_SIZE);
 
     /* graph meta info */
     vid_t nvertices;
