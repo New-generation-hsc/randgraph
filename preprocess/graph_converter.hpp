@@ -11,13 +11,13 @@
 #include "util/util.hpp"
 #include "util/io.hpp"
 
+size_t split_blocks(std::string filename, int fnum, size_t block_size = BLOCK_SIZE);
+
 /** This file defines the data structure that contribute to convert the text format graph to some specific format */
 
 class base_converter {
-protected:
-    std::string output_filename;
 public:
-    base_converter() { }
+    base_converter() = default;
     ~base_converter() { }
     virtual void initialize() { };
     virtual void convert(vid_t from, vid_t to) { };
@@ -54,6 +54,20 @@ private:
     eid_t buf_estart; /* current buffer start edge */
     eid_t rd_edges;
     eid_t csr_pos;
+
+    std::string output_filename;
+
+    void setup_output(const std::string& input) {
+        std::string folder = randgraph_output_folder(get_path_name(input), BLOCK_SIZE);
+        if(!test_folder_exists(folder)) randgraph_mkdir(folder.c_str());
+        output_filename = randgraph_output_filename(get_path_name(input), get_file_name(input), BLOCK_SIZE);
+    }
+
+    void setup_output(const std::string& path, const std::string& dataset) {
+        std::string folder = randgraph_output_folder(path, BLOCK_SIZE);
+        if(!test_folder_exists(folder)) randgraph_mkdir(folder.c_str());
+        output_filename = randgraph_output_filename(path, dataset, BLOCK_SIZE);
+    }
 
     void flush_beg_pos() {
         std::string name = get_beg_pos_name(output_filename, fnum);
@@ -96,21 +110,30 @@ private:
         }
     }
 public:
-    graph_converter(std::string output) { 
-        output_filename = output;
+    graph_converter() = delete;
+    graph_converter(const std::string& path) { 
         fnum = 0;
         beg_pos.alloc(VERT_SIZE);
         csr.alloc(EDGE_SIZE);
         deg.alloc(VERT_SIZE);
         curr_vert = max_vert = buf_vstart = buf_estart = rd_edges = csr_pos = 0;
+        setup_output(path);
     }
-    graph_converter(std::string output, size_t vert_size, size_t edge_size) {
-        output_filename = output;
+    graph_converter(const std::string& folder, const std::string& dataset) { 
+        fnum = 0;
+        beg_pos.alloc(VERT_SIZE);
+        csr.alloc(EDGE_SIZE);
+        deg.alloc(VERT_SIZE);
+        curr_vert = max_vert = buf_vstart = buf_estart = rd_edges = csr_pos = 0;
+        setup_output(folder, dataset);
+    }
+    graph_converter(const std::string& path, size_t vert_size, size_t edge_size) {
         fnum = 0;
         beg_pos.alloc(vert_size);
         csr.alloc(edge_size);
         deg.alloc(vert_size);
         curr_vert = max_vert = buf_vstart = buf_estart = rd_edges = csr_pos = 0;
+        setup_output(path);
     }
     ~graph_converter() {
         beg_pos.destroy();
@@ -163,9 +186,10 @@ public:
     }
 
     int get_fnum() { return this->fnum + 1; }
+    std::string get_output_filename() const { return output_filename; }
 };
 
-void convert(std::string filename, graph_converter &converter) {
+void convert(std::string filename, graph_converter &converter, size_t blocksize = BLOCK_SIZE) {
     
     FILE *fp = fopen(filename.c_str(), "r");
     assert(fp != NULL);
@@ -189,13 +213,16 @@ void convert(std::string filename, graph_converter &converter) {
         converter.convert(from, to);
     }
     converter.finalize();
+
+    /* split the data into multiple blocks */
+    split_blocks(converter.get_output_filename(), 0, blocksize);
 }
 
 /** =========================================================================== */
 /*  This code has some bugs, I will fix them in a few days                      */
 /** =========================================================================== */
 /** split the beg_pos into multiple blocks, each block max size is BLOCKSIZE */
-size_t split_blocks(std::string filename, int fnum, size_t block_size = BLOCK_SIZE) {
+size_t split_blocks(std::string filename, int fnum, size_t block_size) {
     eid_t max_nedges = (eid_t)block_size / sizeof(vid_t);
     logstream(LOG_INFO) << "start split blocks, blocksize = " << block_size / (1024 * 1024) << "MB, max_nedges = " << max_nedges << std::endl;
 
