@@ -9,6 +9,11 @@
 #include <sys/stat.h>
 #include <cstdio>
 
+// for windows mkdir
+#ifdef _WIN32
+#include <dirent.h>
+#endif
+
 #define max_value(a, b) (((a) > (b)) ? (a) : (b))
 #define min_value(a, b) (((a) < (b)) ? (a) : (b))
 
@@ -95,6 +100,50 @@ bid_t get_block(std::vector<vid_t>& vblocks, vid_t v) {
         if(v < vblocks[p+1]) return p;
     }
     return nblocks;
+}
+
+std::string get_path_name(const std::string& s) {
+    char sep = '/';
+#ifdef _WIN32
+    sep = '\\';
+#endif
+    size_t pos = s.rfind(sep, s.length());
+    if(pos != std::string::npos) return s.substr(0, pos + 1);
+    return "./";
+}
+
+std::string get_file_name(const std::string& s) {
+    char sep = '/';
+#ifdef _WIN32
+    sep = '\\';
+#endif
+    size_t pos = s.rfind(sep, s.length());
+    if (pos != std::string::npos) return s.substr(pos + 1, s.length() - pos - 1);
+    return s;
+}
+
+int randgraph_mkdir(const char* path) {
+#ifdef _WIN32
+    return ::_mkdir(path);
+#else
+    return ::mkdir(path, 0777);
+#endif
+}
+
+bool test_folder_exists(const std::string& folder_name) {
+    struct stat st;
+    int ret = stat(folder_name.c_str(), &st);
+    return ret == 0 && (st.st_mode & S_IFDIR);
+}
+
+std::string randgraph_output_folder(const std::string& folder, size_t blocksize) {
+    std::string output = folder + concatnate_name("randgraph", blocksize / (1024 * 1024));
+    return output;
+}
+
+std::string randgraph_output_filename(const std::string& folder, const std::string& dataset_name, size_t blocksize) {
+    std::string output_filename = randgraph_output_folder(folder, blocksize) + "/" + dataset_name;
+    return output_filename;
 }
 
 #endif

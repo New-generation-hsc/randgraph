@@ -35,12 +35,14 @@ public:
     graph_buffer<walk_t>   walks;         /* the walks in cuurent block */
 
     graph_driver *global_driver;
+    std::string base_name;                /* the dataset base name */
 
     graph_walk(graph_config& conf, graph_block & blocks, graph_driver &driver) {
         nvertices = conf.nvertices;
         nedges    = conf.nedges;
         nthreads = conf.nthreads;
         global_blocks = &blocks;
+        base_name = conf.base_name;
 
         maxhops.resize(global_blocks->nblocks, 0);
 
@@ -76,6 +78,8 @@ public:
     ~graph_walk() {
         for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
             close(block_desc[blk]);
+            std::string walk_name = get_walk_name(base_name, blk);
+            unlink(walk_name.c_str());
         }
 
         for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
