@@ -90,6 +90,21 @@ public:
     }
 };
 
+void swap(cache_block& cb1, cache_block& cb2) {
+    block_t *tblock = cb2.block;
+    eid_t *tbeg_pos = cb2.beg_pos;
+    vid_t *tdegree  = cb2.degree;
+    vid_t *tcsr     = cb2.csr;
+    cb2.block = cb1.block;
+    cb2.beg_pos = cb1.beg_pos;
+    cb2.degree = cb1.degree;
+    cb2.csr = cb1.csr;
+    cb1.block = tblock;
+    cb1.beg_pos = tbeg_pos;
+    cb1.degree = tdegree;
+    cb1.csr = tcsr;
+}
+
 class graph_block {
 public:
     bid_t nblocks;
