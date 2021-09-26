@@ -81,8 +81,36 @@ public:
 
         bid_t blk = 0;
         std::vector<bid_t> blocks = choose_blocks(cache.ncblock, global_blocks);
-        for(; blk < blocks.size(); blk++) {
-            bid_t p = blocks[blk];
+        // for(; blk < blocks.size(); blk++) {
+        //     bid_t p = blocks[blk];
+        //     cache.cache_blocks[blk].block  = &global_blocks->blocks[p];
+        //     cache.cache_blocks[blk].block->status = ACTIVE;
+        //     cache.cache_blocks[blk].beg_pos = (eid_t*)realloc(cache.cache_blocks[blk].beg_pos, (global_blocks->blocks[p].nverts + 1) * sizeof(eid_t));
+        //     cache.cache_blocks[blk].csr     = (vid_t*)realloc(cache.cache_blocks[blk].csr   , global_blocks->blocks[p].nedges * sizeof(vid_t));
+
+        //     driver.load_block_vertex(vertdesc, cache.cache_blocks[blk].beg_pos, global_blocks->blocks[p]);
+        //     driver.load_block_edge(edgedesc,  cache.cache_blocks[blk].csr,    global_blocks->blocks[p]);
+        // }
+
+        // nrblock = blocks.size();
+        // exec_blk = 0;
+
+        // for(; blk < cache.ncblock; blk++) {
+        //     if(cache.cache_blocks[blk].block) {
+        //         cache.cache_blocks[blk].block = NULL;
+        //     }
+        // }
+
+        std::vector<bid_t> noncached_blocks;
+        for(const auto & p : blocks) {
+            bid_t cache_index = 0;
+            if(cache.test_block_cached(p, cache_index)) {
+                std::swap(cache[cache_index], cache[blk]);
+                blk++;
+            }else noncached_blocks.push_back(p);
+        }
+
+        for(const auto & p : noncached_blocks) {
             cache.cache_blocks[blk].block  = &global_blocks->blocks[p];
             cache.cache_blocks[blk].block->status = ACTIVE;
             cache.cache_blocks[blk].beg_pos = (eid_t*)realloc(cache.cache_blocks[blk].beg_pos, (global_blocks->blocks[p].nverts + 1) * sizeof(eid_t));
@@ -91,9 +119,6 @@ public:
             driver.load_block_vertex(vertdesc, cache.cache_blocks[blk].beg_pos, global_blocks->blocks[p]);
             driver.load_block_edge(edgedesc,  cache.cache_blocks[blk].csr,    global_blocks->blocks[p]);
         }
-
-        nrblock = blocks.size();
-        exec_blk = 0;
 
         for(; blk < cache.ncblock; blk++) {
             if(cache.cache_blocks[blk].block) {
