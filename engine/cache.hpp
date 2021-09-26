@@ -147,6 +147,16 @@ public:
         setup(nblocks, blocksize);
     }
 
+    cache_block& operator[](size_t index) {
+        assert(index < ncblock);
+        return cache_blocks[index];
+    }
+
+    cache_block operator[](size_t index) const {
+        assert(index < ncblock);
+        return cache_blocks[index];
+    }
+
     void setup(bid_t nblocks, size_t blocksize = BLOCK_SIZE) {
         ncblock = min_value(nblocks, MEMORY_CACHE / blocksize);
         assert(ncblock > 0);
