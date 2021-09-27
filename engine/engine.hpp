@@ -56,7 +56,6 @@ public:
         timer.start_time();
         int run_count = 0;
         while(!walk_mangager->test_finished_walks()) {
-            run_count++;
             bid_t exec_idx = block_scheduler.schedule(*cache, *driver, *walk_mangager);
             exec_block = cache->cache_blocks[exec_idx].block->blk;
             cache_block *run_block  = &cache->cache_blocks[exec_idx];
@@ -68,7 +67,7 @@ public:
 
             vid_t nverts = run_block->block->nverts;
             eid_t nedges = run_block->block->nedges;
-            if(run_count % (1024*1024*1024 / nedges + 1) == 1)
+            if(run_count % 100 == 0)
             {
                 logstream(LOG_DEBUG) << timer.runtime() << "s : run count : " << run_count << std::endl;
                 logstream(LOG_DEBUG) << "nverts = " << nverts << ", nedges = " << nedges << std::endl;
@@ -77,11 +76,12 @@ public:
             exec_block_walk(userprogram, nwalks, run_block);
             walk_mangager->dump_walks(exec_block);
             run_block->block->status = USED;
+            run_count++;
         }
         logstream(LOG_DEBUG) << timer.runtime() << "s, total run count : " << run_count << std::endl;
     }
 
-    void epilogue(randomwalk_t& userprogram) { 
+    void epilogue(randomwalk_t& userprogram) {
         logstream(LOG_INFO) << "  ================= FINISHED ======================  " << std::endl;
     }
 
