@@ -21,7 +21,7 @@ struct rank_compare {
 };
 
 /** graph_scheduler
- * 
+ *
  * This file contribute to define the interface how to schedule cache blocks
  */
 
@@ -40,7 +40,7 @@ public:
         edgedesc = open(csr_name.c_str(), O_RDONLY);
         degdesc  = open(degree_name.c_str(), O_RDONLY);
     }
-    ~scheduler() { 
+    ~scheduler() {
         close(vertdesc);
         close(edgedesc);
         close(degdesc);
@@ -60,7 +60,7 @@ public:
     }
 
     /** If the cache block has no walk, then swap out all blocks */
-    bid_t schedule(graph_cache& cache, graph_driver& driver, graph_walk &walk_manager) { 
+    bid_t schedule(graph_cache& cache, graph_driver& driver, graph_walk &walk_manager) {
         if(walk_manager.test_finished_cache_walks(&cache)) {
             swap_blocks(cache, driver, walk_manager.global_blocks);
         }
@@ -70,7 +70,7 @@ public:
         return ret;
     }
 
-    void swap_blocks(graph_cache& cache, graph_driver& driver, graph_block* global_blocks) { 
+    void swap_blocks(graph_cache& cache, graph_driver& driver, graph_block* global_blocks) {
         // set the all cached blocks inactive */
         _m.start_time("graph_scheduler_swap_blocks");
         for(bid_t p = 0; p < cache.ncblock; p++) {
@@ -84,17 +84,7 @@ public:
         nrblock = blocks.size();
         exec_blk = 0;
 
-        std::vector<bid_t> noncached_blocks;
         for(const auto & p : blocks) {
-            bid_t cache_index = 0;
-            if(cache.test_block_cached(p, cache_index)) {
-                swap(cache[cache_index], cache[blk]);
-                cache[blk].block->status = ACTIVE;
-                blk++;
-            }else noncached_blocks.push_back(p);
-        }
-
-        for(const auto & p : noncached_blocks) {
             cache.cache_blocks[blk].block  = &global_blocks->blocks[p];
             cache.cache_blocks[blk].block->status = ACTIVE;
             cache.cache_blocks[blk].beg_pos = (eid_t*)realloc(cache.cache_blocks[blk].beg_pos, (global_blocks->blocks[p].nverts + 1) * sizeof(eid_t));
@@ -113,14 +103,14 @@ public:
         _m.stop_time("graph_scheduler_swap_blocks");
     }
 
-    std::vector<bid_t> choose_blocks(bid_t ncblocks, graph_block* global_blocks) { 
+    std::vector<bid_t> choose_blocks(bid_t ncblocks, graph_block* global_blocks) {
         std::vector<bid_t> blocks;
         std::priority_queue<std::pair<bid_t, rank_t>, std::vector<std::pair<bid_t, rank_t>>, rank_compare> pq;
-        for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) { 
+        for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
             pq.push(std::make_pair(blk, global_blocks->blocks[blk].rank));
         }
 
-        while(!pq.empty() && ncblocks) { 
+        while(!pq.empty() && ncblocks) {
             auto kv = pq.top();
             if(kv.second == 0) break;
             blocks.push_back(kv.first);
