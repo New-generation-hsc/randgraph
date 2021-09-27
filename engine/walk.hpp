@@ -19,6 +19,9 @@ public:
     std::vector<int>       block_desc;     /* the descriptor of each block walk file */
     graph_buffer<walk_t> **block_walks;   /* the walk resident in memory */
     graph_buffer<walk_t>   walks;         /* the walks in cuurent block */
+#ifdef FASTSKIP
+    std::vector<bool> ismodify;           /* whether the block has updated or not */
+#endif
 
     graph_driver *global_driver;
     std::string base_name;                /* the dataset base name */
@@ -45,11 +48,11 @@ public:
         }
 
         block_desc.resize(global_blocks->nblocks);
-        for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) { 
+        for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
             std::string walk_name = get_walk_name(conf.base_name, blk);
             block_desc[blk] = open(walk_name.c_str(), O_RDWR | O_CREAT | O_TRUNC | O_APPEND, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
         }
-        
+
         block_walks = (graph_buffer<walk_t> **)malloc(global_blocks->nblocks * sizeof(graph_buffer<wid_t> *));
         for(bid_t blk = 0; blk < global_blocks->nblocks; blk++) {
             block_walks[blk] = (graph_buffer<walk_t> *)malloc(nthreads * sizeof(graph_buffer<walk_t>));
@@ -59,6 +62,10 @@ public:
         }
 
         global_driver = &driver;
+#ifdef FASTSKIP
+        ismodify.resize(global_blocks->nblocks);
+        std::fill(ismodify.begin(), ismodify.end(), false);
+#endif
     }
 
     ~graph_walk() {
@@ -81,6 +88,9 @@ public:
         if (block_walks[blk][t].full()){
             persistent_walks(t, blk);
         }
+#ifdef FASTSKIP
+        ismodify[blk] = true;
+#endif
         block_nmwalk[blk][t] += 1;
         walk_t newwalk = WALKER_MAKEUP(WALKER_SOURCE(oldwalk), dst, hop);
         block_walks[blk][t].push_back(newwalk);
@@ -129,7 +139,7 @@ public:
         return walksum;
     }
 
-    wid_t ndwalks(bid_t exec_block) { 
+    wid_t ndwalks(bid_t exec_block) {
         wid_t walksum = 0;
         for(tid_t t = 0; t < nthreads; t++) {
             walksum += block_ndwalk[exec_block][t];
@@ -141,7 +151,7 @@ public:
         wid_t mwalk_count = this->nmwalks(exec_block), dwalk_count = this->ndwalks(exec_block);
         walks.alloc(mwalk_count + dwalk_count);
         global_driver->load_walk(block_desc[exec_block], dwalk_count, walks);
-        
+
         /** load the in-memory */
         for(tid_t t = 0; t < nthreads; t++) {
             if(block_walks[exec_block][t].empty()) continue;
@@ -164,6 +174,9 @@ public:
         for(tid_t t = 0; t < nthreads; t++) {
             block_walks[exec_block][t].clear();
         }
+#ifdef FASTSKIP
+        ismodify[exec_block] = false;
+#endif
     }
 
     bool test_finished_walks() {
@@ -194,7 +207,7 @@ public:
         }
     }
 
-    bid_t max_hops_block() { 
+    bid_t max_hops_block() {
         hid_t walk_hop = 0;
         bid_t blk = 0;
         for(bid_t p = 0; p < global_blocks->nblocks; p++) {

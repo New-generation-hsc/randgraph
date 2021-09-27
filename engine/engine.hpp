@@ -58,6 +58,9 @@ public:
         while(!walk_mangager->test_finished_walks()) {
             bid_t exec_idx = block_scheduler.schedule(*cache, *driver, *walk_mangager);
             exec_block = cache->cache_blocks[exec_idx].block->blk;
+#ifdef FASTSKIP
+            if(!walk_mangager->ismodify[exec_block]) continue; // fast skip
+#endif
             cache_block *run_block  = &cache->cache_blocks[exec_idx];
             run_block->block->status = USING;
 
