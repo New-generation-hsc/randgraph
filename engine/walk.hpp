@@ -89,7 +89,10 @@ public:
             persistent_walks(t, blk);
         }
 #ifdef FASTSKIP
-        ismodify[blk] = true;
+        #pragma omp critical
+        {
+            ismodify[blk] = true;
+        }
 #endif
         block_nmwalk[blk][t] += 1;
         walk_t newwalk = WALKER_MAKEUP(WALKER_SOURCE(oldwalk), dst, hop);

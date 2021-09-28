@@ -23,7 +23,7 @@ int main(int argc, const char* argv[]) {
     vid_t nvertices;
     eid_t nedges;
     load_graph_meta(base_name, &nvertices, &nedges);
-    
+
     graph_config conf = {
         base_name,
         0,
@@ -41,11 +41,12 @@ int main(int argc, const char* argv[]) {
     walk_schedule_t walk_scheduler(&conf, 0.2, m);
 
     graph_walk walk_mangager(conf, blocks, driver);
-    graph_cache cache(blocks.nblocks, conf.blocksize);
-    
+    int nmblocks = get_option_int("nmblocks", blocks.nblocks);
+    graph_cache cache(nmblocks, conf.blocksize);
+
     randomwalk_t userprogram(100000, 25, 0.15);
     graph_engine engine(cache, walk_mangager, driver, conf, m);
-    
+
     engine.prologue(userprogram);
     if(is_walk_schedule) engine.run(userprogram, walk_scheduler);
     else engine.run(userprogram, block_scheduler);
