@@ -44,7 +44,7 @@ int main(int argc, const char* argv[]) {
     int nmblocks = get_option_int("nmblocks", blocks.nblocks);
     graph_cache cache(nmblocks, conf.blocksize);
 
-    randomwalk_t userprogram(100000, 25, 0.15);
+    randomwalk_t userprogram(100000, 25, 0.15, m);
     graph_engine engine(cache, walk_mangager, driver, conf, m);
 
     engine.prologue(userprogram);

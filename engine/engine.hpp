@@ -48,6 +48,13 @@ public:
         for(bid_t blk = 0; blk < walk_mangager->global_blocks->nblocks; blk++) {
             walk_mangager->set_max_hop(blk, userprogram.get_hops());
         }
+
+        const auto& blocks = walk_mangager->global_blocks->blocks;
+        for(bid_t blk = 0; blk < walk_mangager->global_blocks->nblocks; blk++) {
+            logstream(LOG_INFO) << "blk [ " << blk << " ] : vert = [ " << blocks[blk].start_vert << ", " << blocks[blk].start_vert + blocks[blk].nverts << " ], csr = [ ";
+            logstream(LOG_INFO) << blocks[blk].start_edge << ", " << blocks[blk].start_edge + blocks[blk].nedges << " ], walks num = ";
+            logstream(LOG_INFO) << walk_mangager->nblockwalks(blk) << ", vertices num = " << blocks[blk].nverts << std::endl;
+        }
     }
 
     void run(randomwalk_t& userprogram, scheduler& block_scheduler) {

@@ -128,9 +128,6 @@ public:
             blocks[blk].nedges     = eblocks[blk+1] - eblocks[blk];
             blocks[blk].status     = INACTIVE;
             blocks[blk].rank       = 0;
-
-            logstream(LOG_INFO) << "blk [ " << blk << " ] : vert = [ " << blocks[blk].start_vert << ", " << blocks[blk].start_vert + blocks[blk].nverts << " ], csr = [ ";
-            logstream(LOG_INFO) << blocks[blk].start_edge << ", " << blocks[blk].start_edge + blocks[blk].nedges << " ]" << std::endl;
         }
     }
 
