@@ -11,6 +11,7 @@ typedef uint16_t hid_t;   /* walk hop */
 typedef uint16_t tid_t;   /* thread id */
 typedef uint32_t wid_t;   /* walk id */
 typedef uint64_t walk_t;  /* walker data type */
+typedef float    real_t;  /* the edge weight */
 
 #define HOPSIZE  8        /* hop field size */
 #define POSHIFT  8        /* pos field shift */
