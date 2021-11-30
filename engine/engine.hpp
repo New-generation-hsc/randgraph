@@ -6,6 +6,7 @@
 #include "apps/randomwalk.hpp"
 #include "util/timer.hpp"
 #include "metrics/metrics.hpp"
+#include "sample.hpp"
 
 class graph_engine {
 public:
@@ -50,13 +51,13 @@ public:
         }
     }
 
-    void run(randomwalk_t& userprogram, scheduler& block_scheduler) {
+    void run(randomwalk_t& userprogram, scheduler* block_scheduler, sample_policy_t* sampler) {
         logstream(LOG_DEBUG) << "graph blocks : " << walk_mangager->global_blocks->nblocks << ", memory blocks : " << cache->ncblock << std::endl;
         logstream(LOG_INFO) << "Random walks start executing, please wait for a minute." << std::endl;
         timer.start_time();
         int run_count = 0;
         while(!walk_mangager->test_finished_walks()) {
-            bid_t exec_idx = block_scheduler.schedule(*cache, *driver, *walk_mangager);
+            bid_t exec_idx = block_scheduler->schedule(*cache, *driver, *walk_mangager);
             exec_block = cache->cache_blocks[exec_idx].block->blk;
 #ifdef FASTSKIP
             if(!walk_mangager->ismodify[exec_block]) continue; // fast skip
@@ -76,7 +77,7 @@ public:
                 logstream(LOG_DEBUG) << "nverts = " << nverts << ", nedges = " << nedges << std::endl;
                 logstream(LOG_INFO) << "exec_block : " << exec_block << ", walk num : " << nwalks << ", walksum : " << walk_mangager->nwalks() << std::endl;
             }
-            exec_block_walk(userprogram, nwalks, run_block);
+            exec_block_walk(userprogram, nwalks, run_block, sampler);
             walk_mangager->dump_walks(exec_block);
             run_block->block->status = USED;
             run_count++;
@@ -88,14 +89,14 @@ public:
         logstream(LOG_INFO) << "  ================= FINISHED ======================  " << std::endl;
     }
 
-    void exec_block_walk(randomwalk_t &userprogram, wid_t nwalks, cache_block *run_block) {
+    void exec_block_walk(randomwalk_t &userprogram, wid_t nwalks, cache_block *run_block, sample_policy_t* sampler) {
         if(nwalks < 100) omp_set_num_threads(1);
         else omp_set_num_threads(conf->nthreads);
 
         {
             #pragma omp parallel for schedule(static)
             for(wid_t idx = 0; idx < nwalks; idx++) {
-                userprogram.update_walk(walk_mangager->walks[idx], run_block, walk_mangager);
+                userprogram.update_walk(walk_mangager->walks[idx], run_block, walk_mangager, sampler);
             }
         }
     }

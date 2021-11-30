@@ -5,6 +5,7 @@
 #include "engine/schedule.hpp"
 #include "engine/walk.hpp"
 #include "engine/engine.hpp"
+#include "engine/sample.hpp"
 #include "logger/logger.hpp"
 #include "util/io.hpp"
 #include "util/util.hpp"
@@ -44,12 +45,28 @@ int main(int argc, const char* argv[]) {
     int nmblocks = get_option_int("nmblocks", blocks.nblocks);
     graph_cache cache(nmblocks, conf.blocksize);
 
-    randomwalk_t userprogram(100000, 25, 0.15);
+    randomwalk_t userprogram(100000, 25, 0.15, m);
     graph_engine engine(cache, walk_mangager, driver, conf, m);
 
+    naive_sample_t  naive_sampler(m);
+    its_sample_t    its_sampler(m);
+    alias_sample_t  alias_sampler(m);
+    reject_sample_t reject_sampler(m);
+
+    scheduler *scheduler = nullptr;
+    sample_policy_t *sampler = nullptr;
+
+
     engine.prologue(userprogram);
-    if(is_walk_schedule) engine.run(userprogram, walk_scheduler);
-    else engine.run(userprogram, block_scheduler);
+    if(is_walk_schedule) scheduler = &walk_scheduler;
+    else scheduler = &block_scheduler;
+
+    std::string type = get_option_string("sample", "naive");
+    if(type == "its") sampler = &its_sampler;
+    else if(type == "alias") sampler = &alias_sampler;
+    else if(type == "reject") sampler = &reject_sampler;
+    else sampler = &naive_sampler;
+    engine.run(userprogram, scheduler, sampler);
     engine.epilogue(userprogram);
 
     metrics_report(m);

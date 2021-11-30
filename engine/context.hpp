@@ -5,6 +5,7 @@
 #include <ctime>
 #include "api/types.hpp"
 #include "logger/logger.hpp"
+#include "sample.hpp"
 
 /** graph context
  * 
@@ -13,7 +14,7 @@
 
 class context { 
 public:
-    virtual vid_t transition(unsigned *seed) {
+    virtual vid_t transition(sample_policy_t*, unsigned *seed) {
         return 0;
     }
 };
@@ -34,11 +35,15 @@ public:
         this->nvertices = _nvertices;
     }
 
-    vid_t transition(unsigned *seed) { 
+    vid_t transition(sample_policy_t* sampler, unsigned *seed) { 
         eid_t deg = (eid_t)(adj_end - adj_start);
         if(deg > 0 && (float)rand_r(seed) / RAND_MAX > teleport) {
-            vid_t off = (vid_t)rand_r(seed) % deg;
-            return this->adj_start[off];
+            // vid_t off = (vid_t)rand_r(seed) % deg;
+            // return this->adj_start[off];
+            std::vector<real_t> weights(deg);
+            unsigned int aux_seed = static_cast<unsigned int>(time(NULL) + deg);
+            for (auto &w : weights) w = static_cast<real_t>(rand_r(&aux_seed)) / static_cast<real_t>(RAND_MAX) * 10.0;
+            return sample(sampler, weights);
         }else {
             return rand_r(seed) % nvertices;
         }

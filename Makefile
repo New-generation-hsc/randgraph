@@ -3,7 +3,7 @@ CC = g++
 INCLUDE = -I.
 FLAGS = -std=c++11 -lpthread -fopenmp -Wall -D FASTSKIP
 
-apps : test/preprocess test/walk
+apps : test/preprocess test/walk test/test_sample
 
 test/% : test/%.cpp
 	@mkdir -p bin/$(@D)

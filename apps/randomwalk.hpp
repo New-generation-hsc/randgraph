@@ -8,6 +8,8 @@
 #include "api/types.hpp"
 #include "engine/walk.hpp"
 #include "engine/context.hpp"
+#include "engine/sample.hpp"
+#include "metrics/metrics.hpp"
 
 class randomwalk_t {
 protected:
@@ -15,14 +17,17 @@ protected:
     hid_t steps;        /* the number of hops */
     float teleport;   /* the probability teleport to source vertex */
 
+private:
+    metrics &_m;
+
 public:
-    randomwalk_t(wid_t num, hid_t hops, float prob) { 
+    randomwalk_t(wid_t num, hid_t hops, float prob, metrics &m) : _m(m) {
         numsources = num;
         steps = hops;
         teleport = prob;
     }
 
-    void update_walk(walk_t walk, cache_block* cache, graph_walk *walk_manager) {
+    void update_walk(walk_t walk, cache_block* cache, graph_walk *walk_manager, sample_policy_t* sampler) {
         tid_t tid = omp_get_thread_num();
         vid_t dst = WALKER_POS(walk);
         hid_t hop = WALKER_HOP(walk);
@@ -33,7 +38,9 @@ public:
             vid_t off = dst - start_vert;
             eid_t adj_head = cache->beg_pos[off] - cache->block->start_edge, adj_tail = cache->beg_pos[off + 1] - cache->block->start_edge;
             graph_context ctx(dst, cache->csr + adj_head, cache->csr + adj_tail, teleport, walk_manager->nvertices);
-            dst = choose_next(ctx, &seed);
+            _m.start_time("vertex_sample");
+            dst = choose_next(ctx, sampler, &seed);
+            _m.stop_time("vertex_sample");
             hop--;
         }
 
@@ -45,8 +52,8 @@ public:
         }
     }
 
-    vid_t choose_next(context& ctx, unsigned *seed) {
-        return ctx.transition(seed);
+    vid_t choose_next(context& ctx, sample_policy_t* sampler, unsigned *seed) {
+        return ctx.transition(sampler, seed);
     }
 
     wid_t get_numsources() { return numsources; }

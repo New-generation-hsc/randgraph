@@ -7,11 +7,18 @@
 #include <algorithm>
 #include <cassert>
 #include <numeric>
+#include <iostream>
 #include "api/types.hpp"
+#include "metrics/metrics.hpp"
 
 class sample_policy_t {
+protected:
+    metrics &_m;
 public:
-    virtual size_t sample(const std::vector<real_t>&);
+    sample_policy_t(metrics &m) : _m(m) {  }
+    virtual size_t sample(const std::vector<real_t>&) {
+        return 0;
+    }
 };
 
 /**
@@ -19,30 +26,41 @@ public:
 */
 class naive_sample_t : public sample_policy_t {
 public:
+    naive_sample_t(metrics &m) : sample_policy_t(m) {  }
     size_t sample(const std::vector<real_t>& weights) {
         size_t n = weights.size();
         return rand() % n;
     }
 };
 
-/** This method first computes the cumulative distribution of weights, 
+/** This method first computes the cumulative distribution of weights,
  * then generates a random number x between [0, P_sum),
  * finally uses a binary search to find the smallest index i such that x < P_i
 */
 class its_sample_t : public sample_policy_t {
 public:
+    its_sample_t(metrics &m) : sample_policy_t(m) {  }
     size_t sample(const std::vector<real_t>& weights) {
         size_t n = weights.size();
+        _m.start_time("sample_initialization");
         std::vector<real_t> prefix_sum(n + 1, 0.0);
         for(size_t idx = 1; idx <= n; idx++) {
             prefix_sum[idx] = prefix_sum[idx - 1] + weights[idx - 1];
         }
+        _m.stop_time("sample_initialization");
 
+        _m.start_time("sample_generation");
         real_t diff = prefix_sum[n];
         real_t random = (real_t)rand() / (real_t)RAND_MAX;
         real_t rand_val = diff * random;
         size_t pos = std::lower_bound(prefix_sum.begin(), prefix_sum.end(), rand_val) - prefix_sum.begin();
         assert(pos > 0 && pos <= n);
+#ifdef TEST_SAMPLE
+        std::cout << "prefix:";
+        for(const auto & s : prefix_sum) std::cout << " " << s;
+        std::cout << std::endl;
+#endif
+        _m.stop_time("sample_generation");
         return pos - 1;
     }
 };
@@ -56,8 +74,10 @@ public:
  */
 class alias_sample_t : public sample_policy_t {
 public:
+    alias_sample_t(metrics &m) : sample_policy_t(m) {  }
     size_t sample(const std::vector<real_t> &weights){
         size_t n = weights.size();
+        _m.start_time("sample_initialization");
         std::vector<real_t> aux_weights(weights.begin(), weights.end());
         real_t sum = std::accumulate(weights.begin(), weights.end(), 0.0);
         real_t avg = sum / static_cast<real_t>(n);
@@ -93,8 +113,20 @@ public:
             alias_table[s] = n;
         }
 
+        _m.stop_time("sample_initialization");
+#ifdef TEST_SAMPLE
+        std::cout << "avg: " << avg << std::endl;
+        std::cout << "prob table:";
+        for (const auto &s : prob_table) std::cout << " " << s;
+        std::cout << "\nalias table:";
+        for(const auto &s : alias_table) std::cout << " " << s;
+        std::cout << std::endl;
+#endif
+
+        _m.start_time("sample_generation");
         real_t rand_val = static_cast<real_t>(rand()) / static_cast<real_t>(RAND_MAX) * avg;
         size_t rand_pos = rand() % n;
+        _m.stop_time("sample_generation");
         if(rand_val < prob_table[rand_pos]) return rand_pos;
         else return alias_table[rand_pos];
     }
@@ -109,21 +141,26 @@ public:
 */
 class reject_sample_t : public sample_policy_t {
 public:
+    reject_sample_t(metrics &m) : sample_policy_t(m) {  }
     size_t sample(const std::vector<real_t> &weights){
         size_t n = weights.size();
+        _m.start_time("sample_initialization");
         real_t pmax = *std::max_element(weights.begin(), weights.end());
+        _m.stop_time("sample_initialization");
+        _m.start_time("sample_generation");
         real_t rand_val = static_cast<real_t>(rand()) / static_cast<real_t>(RAND_MAX) * pmax;
         real_t rand_pos = rand() % n;
         while(rand_val > weights[rand_pos]) {
             rand_pos = rand() % n;
             rand_val = static_cast<real_t>(rand()) / static_cast<real_t>(RAND_MAX) * pmax;
         }
+        _m.stop_time("sample_generation");
         return rand_pos;
     }
 };
 
-size_t sample(sample_policy_t& sampler, const std::vector<real_t> & weights) {
-    return sampler.sample(weights);
+size_t sample(sample_policy_t* sampler, const std::vector<real_t> & weights) {
+    return sampler->sample(weights);
 }
 
 #endif
