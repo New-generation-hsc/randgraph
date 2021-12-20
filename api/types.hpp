@@ -11,6 +11,7 @@ typedef uint16_t hid_t;   /* walk hop */
 typedef uint16_t tid_t;   /* thread id */
 typedef uint32_t wid_t;   /* walk id */
 typedef uint64_t walk_t;  /* walker data type */
+typedef float    real_t;     /* edge weight */
 
 #define HOPSIZE  8        /* hop field size */
 #define POSHIFT  8        /* pos field shift */
@@ -22,5 +23,6 @@ typedef uint64_t walk_t;  /* walker data type */
 #define WALKER_POS(walker) ((walker >> POSHIFT) & ((0X1 << POSIZE) - 1))
 #define WALKER_HOP(walker) (walker & ((0x1 << HOPSIZE) - 1))
 #define WALKER_MAKEUP(source, pos, hop) ((((walk_t)source & ((0x1 << SOURCESIZE) - 1)) << SOURCESHIFT) | (((walk_t)pos & ((0x1 << POSIZE) - 1)) << POSHIFT) | ((walk_t)hop & ((0x1 << HOPSIZE) - 1)))
+
 
 #endif
