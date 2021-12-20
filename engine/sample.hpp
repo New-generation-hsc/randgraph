@@ -42,14 +42,14 @@ public:
     its_sample_t(metrics &m) : sample_policy_t(m) {  }
     size_t sample(const std::vector<real_t>& weights) {
         size_t n = weights.size();
-        _m.start_time("sample_initialization");
+        //_m.start_time("sample_initialization");
         std::vector<real_t> prefix_sum(n + 1, 0.0);
         for(size_t idx = 1; idx <= n; idx++) {
             prefix_sum[idx] = prefix_sum[idx - 1] + weights[idx - 1];
         }
-        _m.stop_time("sample_initialization");
+        //_m.stop_time("sample_initialization");
 
-        _m.start_time("sample_generation");
+        //_m.start_time("sample_generation");
         real_t diff = prefix_sum[n];
         real_t random = (real_t)rand() / (real_t)RAND_MAX;
         real_t rand_val = diff * random;
@@ -60,7 +60,7 @@ public:
         for(const auto & s : prefix_sum) std::cout << " " << s;
         std::cout << std::endl;
 #endif
-        _m.stop_time("sample_generation");
+        //_m.stop_time("sample_generation");
         return pos - 1;
     }
 };
@@ -77,7 +77,7 @@ public:
     alias_sample_t(metrics &m) : sample_policy_t(m) {  }
     size_t sample(const std::vector<real_t> &weights){
         size_t n = weights.size();
-        _m.start_time("sample_initialization");
+        //_m.start_time("sample_initialization");
         std::vector<real_t> aux_weights(weights.begin(), weights.end());
         real_t sum = std::accumulate(weights.begin(), weights.end(), 0.0);
         real_t avg = sum / static_cast<real_t>(n);
@@ -113,7 +113,7 @@ public:
             alias_table[s] = n;
         }
 
-        _m.stop_time("sample_initialization");
+        //_m.stop_time("sample_initialization");
 #ifdef TEST_SAMPLE
         std::cout << "avg: " << avg << std::endl;
         std::cout << "prob table:";
@@ -123,10 +123,10 @@ public:
         std::cout << std::endl;
 #endif
 
-        _m.start_time("sample_generation");
+        //_m.start_time("sample_generation");
         real_t rand_val = static_cast<real_t>(rand()) / static_cast<real_t>(RAND_MAX) * avg;
         size_t rand_pos = rand() % n;
-        _m.stop_time("sample_generation");
+        //_m.stop_time("sample_generation");
         if(rand_val < prob_table[rand_pos]) return rand_pos;
         else return alias_table[rand_pos];
     }
@@ -144,17 +144,17 @@ public:
     reject_sample_t(metrics &m) : sample_policy_t(m) {  }
     size_t sample(const std::vector<real_t> &weights){
         size_t n = weights.size();
-        _m.start_time("sample_initialization");
+        //_m.start_time("sample_initialization");
         real_t pmax = *std::max_element(weights.begin(), weights.end());
-        _m.stop_time("sample_initialization");
-        _m.start_time("sample_generation");
+        //_m.stop_time("sample_initialization");
+        //_m.start_time("sample_generation");
         real_t rand_val = static_cast<real_t>(rand()) / static_cast<real_t>(RAND_MAX) * pmax;
         real_t rand_pos = rand() % n;
         while(rand_val > weights[rand_pos]) {
             rand_pos = rand() % n;
             rand_val = static_cast<real_t>(rand()) / static_cast<real_t>(RAND_MAX) * pmax;
         }
-        _m.stop_time("sample_generation");
+        //_m.stop_time("sample_generation");
         return rand_pos;
     }
 };

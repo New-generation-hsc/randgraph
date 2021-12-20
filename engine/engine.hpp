@@ -93,12 +93,14 @@ public:
         if(nwalks < 100) omp_set_num_threads(1);
         else omp_set_num_threads(conf->nthreads);
 
+        _m.start_time("exec_block_walk");
         {
             #pragma omp parallel for schedule(static)
             for(wid_t idx = 0; idx < nwalks; idx++) {
                 userprogram.update_walk(walk_mangager->walks[idx], run_block, walk_mangager, sampler);
             }
         }
+        _m.stop_time("exec_block_walk");
     }
 };
 

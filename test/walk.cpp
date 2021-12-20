@@ -43,9 +43,11 @@ int main(int argc, const char* argv[]) {
 
     graph_walk walk_mangager(conf, blocks, driver);
     int nmblocks = get_option_int("nmblocks", blocks.nblocks);
+    int walks = get_option_int("walks", 100000);
+    int steps = get_option_int("length", 25);
     graph_cache cache(nmblocks, conf.blocksize);
 
-    randomwalk_t userprogram(100000, 25, 0.15, m);
+    randomwalk_t userprogram(walks, length, 0.15, m);
     graph_engine engine(cache, walk_mangager, driver, conf, m);
 
     naive_sample_t  naive_sampler(m);
