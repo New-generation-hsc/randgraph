@@ -27,12 +27,12 @@ public:
 
 /**
  * Convert the text format graph dataset into the csr format. the dataset may be very large, so we may split the csr data
- * into multiple files. 
+ * into multiple files.
  * `fnum` records the number of files used to store the csr data.
  * `beg_pos` : records the vertex points the position of csr array
  * `csr` : records the edge destination
  * `deg` : records the degree of each vertex
- * 
+ *
  * `adj` : records the current vertex neighbors
  * `curr_vert` : the current vertex id
  * `max_vert` : records the max vertex id
@@ -41,11 +41,14 @@ public:
 class graph_converter : public base_converter {
 private:
     int fnum;
+    bool _weighted;
     graph_buffer<eid_t> beg_pos;
     graph_buffer<vid_t> csr;
     graph_buffer<vid_t> deg;
+    graph_buffer<real_t> weights;
 
     std::vector<vid_t> adj;
+    std::vector<real_t> adj_weights;
     vid_t curr_vert;
     vid_t max_vert;
 
@@ -75,7 +78,7 @@ private:
         beg_pos.clear();
     }
 
-    void flush_degree() { 
+    void flush_degree() {
         std::string name = get_degree_name(output_filename, fnum);
         appendfile(name, deg.buffer_begin(), deg.size());
         buf_vstart += deg.size();
@@ -95,8 +98,17 @@ private:
         csr.clear();
     }
 
+    void flush_weights() {
+        std::string name = get_weights_name(output_filename, fnum);
+        appendfile(name, weights.buffer_begin(), weights.size());
+        weights.clear();
+    }
+
     void sync_buffer() {
         for(auto & dst : adj) csr.push_back(dst);
+        if(_weighted) {
+            for(const auto & w : adj_weights) weights.push_back(w);
+        }
         csr_pos += adj.size();
         beg_pos.push_back(csr_pos);
         deg.push_back(adj.size());
@@ -111,29 +123,41 @@ private:
     }
 public:
     graph_converter() = delete;
-    graph_converter(const std::string& path) { 
+    graph_converter(const std::string& path, bool weighted = false) {
         fnum = 0;
         beg_pos.alloc(VERT_SIZE);
         csr.alloc(EDGE_SIZE);
         deg.alloc(VERT_SIZE);
         curr_vert = max_vert = buf_vstart = buf_estart = rd_edges = csr_pos = 0;
         setup_output(path);
+        _weighted = weighted;
+        if(_weighted) {
+            weights.alloc(EDGE_SIZE);
+        }
     }
-    graph_converter(const std::string& folder, const std::string& dataset) { 
+    graph_converter(const std::string& folder, const std::string& dataset, bool weighted = false) {
         fnum = 0;
         beg_pos.alloc(VERT_SIZE);
         csr.alloc(EDGE_SIZE);
         deg.alloc(VERT_SIZE);
         curr_vert = max_vert = buf_vstart = buf_estart = rd_edges = csr_pos = 0;
         setup_output(folder, dataset);
+        _weighted = weighted;
+        if(_weighted) {
+            weights.alloc(EDGE_SIZE);
+        }
     }
-    graph_converter(const std::string& path, size_t vert_size, size_t edge_size) {
+    graph_converter(const std::string& path, size_t vert_size, size_t edge_size, bool weighted = false) {
         fnum = 0;
         beg_pos.alloc(vert_size);
         csr.alloc(edge_size);
         deg.alloc(vert_size);
         curr_vert = max_vert = buf_vstart = buf_estart = rd_edges = csr_pos = 0;
         setup_output(path);
+        _weighted = weighted;
+        if(_weighted) {
+            weights.alloc(EDGE_SIZE);
+        }
     }
     ~graph_converter() {
         beg_pos.destroy();
@@ -149,11 +173,14 @@ public:
         beg_pos.push_back(0);
     }
 
-    void convert(vid_t from, vid_t to) {
+    void convert(vid_t from, vid_t to, real_t *weight) {
         max_vert = max_value(max_vert, from);
         max_vert = max_value(max_vert, to);
 
-        if(from == curr_vert) adj.push_back(to);
+        if(from == curr_vert) {
+            adj.push_back(to);
+            if(_weighted) adj_weights.push_back(*weight);
+        }
         else {
             if(csr.test_overflow(adj.size()) || beg_pos.full() ) {
                 flush_buffer();
@@ -167,6 +194,10 @@ public:
             curr_vert = from;
             adj.clear();
             adj.push_back(to);
+            if(_weighted) {
+                adj_weights.clear();
+                adj_weights.push_back(*weight);
+            }
         }
     }
 
@@ -175,6 +206,7 @@ public:
         if(!csr.empty()) flush_csr();
         if(!beg_pos.empty()) flush_beg_pos();
         if(!deg.empty()) flush_degree();
+        if(_weighted && !weights.empty()) flush_weights();
     }
 
     void finalize() {
@@ -187,22 +219,24 @@ public:
 
     int get_fnum() { return this->fnum + 1; }
     std::string get_output_filename() const { return output_filename; }
+    bool is_weighted() const { return _weighted; }
 };
 
 void convert(std::string filename, graph_converter &converter, size_t blocksize = BLOCK_SIZE) {
-    
+
     FILE *fp = fopen(filename.c_str(), "r");
     assert(fp != NULL);
-    
+
     converter.initialize();
     char line[1024];
     while(fgets(line, 1024, fp) != NULL) {
         if(line[0] == '#') continue;
         if(line[0] == '%') continue;
 
-        char *t1, *t2;
+        char *t1, *t2, *t3;
         t1 = strtok(line, "\t, ");
         t2 = strtok(NULL, "\t, ");
+        t3 = strtok(NULL, "\t, ");
         if(t1 == NULL || t2 == NULL) {
             logstream(LOG_ERROR) << "Input file is not the right format. Expected <from> <to>" << std::endl;
             assert(false);
@@ -210,7 +244,13 @@ void convert(std::string filename, graph_converter &converter, size_t blocksize 
         vid_t from = atoi(t1);
         vid_t to = atoi(t2);
         if(from == to) continue;
-        converter.convert(from, to);
+        if(converter.is_weighted()) {
+            assert(t3 != NULL);
+            real_t w = static_cast<real_t>(atof(t3));
+            converter.convert(from, to, &w);
+        }else {
+            converter.convert(from, to, NULL);
+        }
     }
     converter.finalize();
 
@@ -286,7 +326,7 @@ size_t split_blocks(std::string filename, int fnum, size_t block_size) {
 }
 
 /** compute the given graph each vertex point to the same block ratio */
-void compute_graph_degree_ratio(const std::string& filename, int fnum, size_t blocksize = BLOCK_SIZE) { 
+void compute_graph_degree_ratio(const std::string& filename, int fnum, size_t blocksize = BLOCK_SIZE) {
     std::string vert_block_name = get_vert_blocks_name(filename, blocksize);
     std::string edge_block_name = get_edge_blocks_name(filename, blocksize);
     std::string degree_name     = get_degree_name(filename, fnum);
@@ -304,7 +344,7 @@ void compute_graph_degree_ratio(const std::string& filename, int fnum, size_t bl
     logstream(LOG_INFO) << "load vblocks and eblocks successfully, block count : " << nblocks << std::endl;
     vid_t *degree = NULL, *csr = NULL;
     float *ratio = NULL;
-    for(bid_t blk = 0; blk < nblocks; blk++) { 
+    for(bid_t blk = 0; blk < nblocks; blk++) {
         vid_t nverts = vblocks[blk+1] - vblocks[blk];
         eid_t nedges = eblocks[blk+1] - eblocks[blk];
 
@@ -333,7 +373,7 @@ void compute_graph_degree_ratio(const std::string& filename, int fnum, size_t bl
         assert(edge_pos == nedges);
         appendfile(output,ratio, nverts);
     }
-    
+
     /** free the allocate memory */
     if(degree) free(degree);
     if(csr)    free(csr);

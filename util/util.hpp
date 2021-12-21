@@ -50,12 +50,16 @@ inline std::string get_beg_pos_name(std::string const & base_name, int fnum) {
     return concatnate_name(base_name, fnum) + ".beg";
 }
 
-inline std::string get_csr_name(std::string const & base_name, int fnum) { 
+inline std::string get_csr_name(std::string const & base_name, int fnum) {
     return concatnate_name(base_name, fnum) + ".csr";
 }
 
-inline std::string get_degree_name(std::string const & base_name, int fnum) { 
+inline std::string get_degree_name(std::string const & base_name, int fnum) {
     return concatnate_name(base_name, fnum) + ".deg";
+}
+
+inline std::string get_weights_name(std::string const & base_name, int fnum) {
+    return concatnate_name(base_name, fnum) + ".wht";
 }
 
 inline std::string get_vert_blocks_name(std::string const & base_name, size_t blocksize) {
@@ -79,13 +83,13 @@ inline std::string get_meta_name(std::string const & base_name) {
 }
 
 /** test a file existence */
-inline bool test_exists(const std::string & filename) { 
+inline bool test_exists(const std::string & filename) {
     struct stat buffer;
     return (stat(filename.c_str(), &buffer) == 0);
 }
 
 /** test a file existence and if the file exist then delete it */
-inline bool test_delete(const std::string & filename) { 
+inline bool test_delete(const std::string & filename) {
     if(test_exists(filename)) {
         std::remove(filename.c_str());
         return true;
