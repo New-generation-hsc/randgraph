@@ -17,6 +17,7 @@ struct graph_config {
 
     vid_t nvertices;
     eid_t nedges;
+    bool is_weighted;
 };
 
 #endif

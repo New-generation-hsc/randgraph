@@ -27,8 +27,9 @@ struct rank_compare {
 
 class scheduler {
 protected:
-    int vertdesc, edgedesc, degdesc;  /* the beg_pos, csr, degree file descriptor */
+    int vertdesc, edgedesc, degdesc, whtdesc;  /* the beg_pos, csr, degree file descriptor */
     metrics &_m;
+    bool _weighted;
 
 public:
     scheduler(graph_config *conf, metrics& m) : _m(m) {
@@ -39,11 +40,20 @@ public:
         vertdesc = open(beg_pos_name.c_str(), O_RDONLY);
         edgedesc = open(csr_name.c_str(), O_RDONLY);
         degdesc  = open(degree_name.c_str(), O_RDONLY);
+        _weighted = conf->is_weighted;
+
+        if(_weighted) {
+            std::string weight_name = get_weights_name(conf->base_name, conf->fnum);
+            whtdesc = open(weight_name.c_str(), O_RDONLY);
+        }
     }
     ~scheduler() {
         close(vertdesc);
         close(edgedesc);
         close(degdesc);
+        if(_weighted) {
+            close(_weighted);
+        }
     }
     virtual bid_t schedule(graph_cache& cache, graph_driver& driver, graph_walk &walk_manager) = 0;
 
@@ -89,9 +99,13 @@ public:
             cache.cache_blocks[blk].block->status = ACTIVE;
             cache.cache_blocks[blk].beg_pos = (eid_t*)realloc(cache.cache_blocks[blk].beg_pos, (global_blocks->blocks[p].nverts + 1) * sizeof(eid_t));
             cache.cache_blocks[blk].csr     = (vid_t*)realloc(cache.cache_blocks[blk].csr   , global_blocks->blocks[p].nedges * sizeof(vid_t));
-
+            
             driver.load_block_vertex(vertdesc, cache.cache_blocks[blk].beg_pos, global_blocks->blocks[p]);
             driver.load_block_edge(edgedesc,  cache.cache_blocks[blk].csr,    global_blocks->blocks[p]);
+            if (_weighted) {
+                cache.cache_blocks[blk].weights = (real_t *)realloc(cache.cache_blocks[blk].weights, global_blocks->blocks[p].nedges * sizeof(real_t));
+                driver.load_block_weight(whtdesc, cache.cache_blocks[blk].weights, global_blocks->blocks[p]);
+            }
             blk++;
         }
 
@@ -154,6 +168,10 @@ public:
 
         driver.load_block_vertex(vertdesc, cache.cache_blocks[exec_blk].beg_pos, global_blocks->blocks[blk]);
         driver.load_block_edge(edgedesc,  cache.cache_blocks[exec_blk].csr,    global_blocks->blocks[blk]);
+        if (_weighted) {
+            cache.cache_blocks[exec_blk].weights = (real_t *)realloc(cache.cache_blocks[exec_blk].weights, global_blocks->blocks[blk].nedges * sizeof(real_t));
+            driver.load_block_weight(whtdesc, cache.cache_blocks[exec_blk].weights, global_blocks->blocks[blk]);
+        }
         _m.stop_time("walk_schedule_swap_blocks");
         return exec_blk;
     }

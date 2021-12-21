@@ -23,7 +23,8 @@ int main(int argc, const char* argv[]) {
     /* graph meta info */
     vid_t nvertices;
     eid_t nedges;
-    load_graph_meta(base_name, &nvertices, &nedges);
+    bool weighted = get_option_bool("weighted");
+    load_graph_meta(base_name, &nvertices, &nedges, weighted);
 
     graph_config conf = {
         base_name,
@@ -31,7 +32,8 @@ int main(int argc, const char* argv[]) {
         BLOCK_SIZE,
         (tid_t)omp_get_max_threads(),
         nvertices,
-        nedges
+        nedges,
+        weighted
     };
 
     graph_block blocks(&conf);
@@ -42,12 +44,12 @@ int main(int argc, const char* argv[]) {
     walk_schedule_t walk_scheduler(&conf, 0.2, m);
 
     graph_walk walk_mangager(conf, blocks, driver);
-    int nmblocks = get_option_int("nmblocks", blocks.nblocks);
+    bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
     int walks = get_option_int("walks", 100000);
     int steps = get_option_int("length", 25);
-    graph_cache cache(nmblocks, conf.blocksize);
+    graph_cache cache(min_value(nmblocks, blocks.nblocks), conf.blocksize);
 
-    randomwalk_t userprogram(walks, length, 0.15, m);
+    randomwalk_t userprogram(walks, steps, 0.15, m);
     graph_engine engine(cache, walk_mangager, driver, conf, m);
 
     naive_sample_t  naive_sampler(m);
@@ -68,6 +70,8 @@ int main(int argc, const char* argv[]) {
     else if(type == "alias") sampler = &alias_sampler;
     else if(type == "reject") sampler = &reject_sampler;
     else sampler = &naive_sampler;
+
+    logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
     engine.run(userprogram, scheduler, sampler);
     engine.epilogue(userprogram);
 

@@ -34,13 +34,16 @@ public:
 
         unsigned seed = (unsigned)(dst + hop + tid + time(NULL));
         vid_t start_vert = cache->block->start_vert, end_vert = cache->block->start_vert + cache->block->nverts;
+        real_t *weight_start = nullptr, *weight_end = nullptr;
         while(dst >= start_vert && dst < end_vert && hop > 0) {
             vid_t off = dst - start_vert;
             eid_t adj_head = cache->beg_pos[off] - cache->block->start_edge, adj_tail = cache->beg_pos[off + 1] - cache->block->start_edge;
-            graph_context ctx(dst, cache->csr + adj_head, cache->csr + adj_tail, teleport, walk_manager->nvertices);
-            _m.start_time("vertex_sample");
+            if(cache->weights != NULL) {
+                weight_start = cache->weights + adj_head;
+                weight_end   = cache->weights + adj_tail;
+            }
+            graph_context ctx(dst, cache->csr + adj_head, cache->csr + adj_tail, weight_start, weight_end, teleport, walk_manager->nvertices);
             dst = choose_next(ctx, sampler, &seed);
-            _m.stop_time("vertex_sample");
             hop--;
         }
 

@@ -27,6 +27,10 @@ public:
         load_block_range(fd, buf, block.nedges, block.start_edge * sizeof(vid_t));
     }
 
+    void load_block_weight(int fd, real_t* buf, const block_t& block) {
+        load_block_range(fd, buf, block.nedges, block.start_edge * sizeof(real_t));
+    }
+
     void load_walk(int fd, size_t cnt, graph_buffer<walk_t> &walks) {
         load_block_range(fd, walks.buffer_begin(), cnt, 0);
         walks.set_size(cnt);

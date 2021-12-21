@@ -69,6 +69,7 @@ public:
     eid_t *beg_pos;                 
     vid_t *degree;
     vid_t *csr;
+    real_t *weights;
 
     /**
      * record each block life, when swap out, the largest life block will be evicted
@@ -80,6 +81,7 @@ public:
         beg_pos = NULL;
         degree  = NULL;
         csr     = NULL;
+        weights = NULL;
         life = 0;
     }
 
@@ -87,6 +89,7 @@ public:
         if(beg_pos) free(beg_pos);
         if(degree)  free(degree);
         if(csr)     free(csr);
+        if(weights) free(weights);
     }
 };
 
