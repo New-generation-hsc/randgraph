@@ -10,8 +10,9 @@
 #include "logger/logger.hpp"
 #include "util/util.hpp"
 #include "util/io.hpp"
+#include "precompute.hpp"
 
-size_t split_blocks(std::string filename, int fnum, size_t block_size = BLOCK_SIZE);
+size_t split_blocks(const std::string& filename, int fnum, size_t block_size = BLOCK_SIZE);
 
 /** This file defines the data structure that contribute to convert the text format graph to some specific format */
 
@@ -256,13 +257,18 @@ void convert(std::string filename, graph_converter &converter, size_t blocksize 
 
     /* split the data into multiple blocks */
     split_blocks(converter.get_output_filename(), 0, blocksize);
+    
+    /* if the graph is weighted, then preprocess the alias table. */
+    if(converter.is_weighted()) {
+        second_order_precompute(converter.get_output_filename(), 0, blocksize);
+    }
 }
 
 /** =========================================================================== */
 /*  This code has some bugs, I will fix them in a few days                      */
 /** =========================================================================== */
 /** split the beg_pos into multiple blocks, each block max size is BLOCKSIZE */
-size_t split_blocks(std::string filename, int fnum, size_t block_size) {
+size_t split_blocks(const std::string& filename, int fnum, size_t block_size) {
     eid_t max_nedges = (eid_t)block_size / sizeof(vid_t);
     logstream(LOG_INFO) << "start split blocks, blocksize = " << block_size / (1024 * 1024) << "MB, max_nedges = " << max_nedges << std::endl;
 
