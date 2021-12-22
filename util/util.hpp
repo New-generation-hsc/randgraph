@@ -62,7 +62,20 @@ inline std::string get_weights_name(std::string const & base_name, int fnum) {
     return concatnate_name(base_name, fnum) + ".wht";
 }
 
-inline std::string get_vert_blocks_name(std::string const & base_name, size_t blocksize) {
+inline std::string get_prob_name(std::string const & base_name, int fnum) {
+    return concatnate_name(base_name, fnum) + ".pb";
+}
+
+inline std::string get_alias_name(std::string const & base_name, int fnum) {
+    return concatnate_name(base_name, fnum) + ".as";
+}
+
+inline std::string get_accumulate_name(std::string const & base_name, int fnum) {
+    return concatnate_name(base_name, fnum) + ".acc";
+}
+
+inline std::string get_vert_blocks_name(std::string const &base_name, size_t blocksize)
+{
     return concatnate_name(base_name, blocksize / (1024 * 1024)) + "MB.vert.blocks";
 }
 
