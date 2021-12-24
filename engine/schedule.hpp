@@ -115,6 +115,7 @@ public:
         _m.start_time("graph_scheduler_swap_blocks");
         for(bid_t p = 0; p < cache.ncblock; p++) {
             if(cache.cache_blocks[p].block != NULL) {
+                cache.cache_blocks[p].block->cache_index = global_blocks->nblocks;
                 cache.cache_blocks[p].block->status = INACTIVE;
             }
         }
@@ -126,6 +127,7 @@ public:
 
         for(const auto & p : blocks) {
             cache.cache_blocks[blk].block  = &global_blocks->blocks[p];
+            cache.cache_blocks[blk].block->cache_index = blk;
             cache.cache_blocks[blk].block->status = ACTIVE;
             cache.cache_blocks[blk].beg_pos = (eid_t*)realloc(cache.cache_blocks[blk].beg_pos, (global_blocks->blocks[p].nverts + 1) * sizeof(eid_t));
             cache.cache_blocks[blk].csr     = (vid_t*)realloc(cache.cache_blocks[blk].csr   , global_blocks->blocks[p].nedges * sizeof(vid_t));
@@ -207,6 +209,7 @@ public:
         exec_blk = swap_block(cache, walk_manager);
         cache.cache_blocks[exec_blk].block = &global_blocks->blocks[blk];
         cache.cache_blocks[exec_blk].block->status = ACTIVE;
+        cache.cache_blocks[exec_blk].block->cache_index = exec_blk;
 
         cache.cache_blocks[exec_blk].beg_pos = (eid_t*)realloc(cache.cache_blocks[exec_blk].beg_pos, (global_blocks->blocks[blk].nverts + 1) * sizeof(eid_t));
         cache.cache_blocks[exec_blk].csr     = (vid_t*)realloc(cache.cache_blocks[exec_blk].csr   , global_blocks->blocks[blk].nedges * sizeof(vid_t));
@@ -222,7 +225,7 @@ public:
     }
 
     template <typename walk_data_t, WalkType walk_type>
-    bid_t swap_block(graph_cache &cache, graph_walk<walk_data_t, walk_type> &walk_mangager)
+    bid_t swap_block(graph_cache &cache, graph_walk<walk_data_t, walk_type> &walk_manager)
     {
         wid_t walks_cnt = 0xffffffff;
         bid_t blk = 0;
@@ -231,7 +234,7 @@ public:
             if(cache.cache_blocks[p].block == NULL) {
                 blk = p; break;
             }
-            wid_t cnt = walk_mangager.nblockwalks(cache.cache_blocks[p].block->blk);
+            wid_t cnt = walk_manager.nblockwalks(cache.cache_blocks[p].block->blk);
             if(walks_cnt > cnt) {
                 walks_cnt = cnt;
                 blk = p;
@@ -243,6 +246,9 @@ public:
             cache.cache_blocks[p].life += 1;
         }
         cache.cache_blocks[blk].life = 0;
+        if(cache.cache_blocks[blk].block != NULL) {
+            cache.cache_blocks[blk].block->cache_index = walk_manager.global_blocks->nblocks;
+        }
         return blk;
     }
 };

@@ -30,7 +30,7 @@ public:
     }
 
     template <typename walk_data_t, WalkType walk_type>
-    void update_walk(const walker_t<walk_data_t> &walker, cache_block *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler)
+    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler)
     {
     }
 
@@ -56,25 +56,27 @@ void randomwalk_t::prologue<empty_data_t, FirstOrder>(graph_walk<empty_data_t, F
 }
 
 template <>
-void randomwalk_t::update_walk<empty_data_t, FirstOrder>(const walker_t<empty_data_t>& walker, cache_block *cache, graph_walk<empty_data_t, FirstOrder> *walk_manager, sample_policy_t *sampler)
+void randomwalk_t::update_walk<empty_data_t, FirstOrder>(const walker_t<empty_data_t>& walker, graph_cache *cache, graph_walk<empty_data_t, FirstOrder> *walk_manager, sample_policy_t *sampler)
 {
     tid_t tid = omp_get_thread_num();
     vid_t dst = WALKER_POS(walker);
     hid_t hop = WALKER_HOP(walker);
+    bid_t p = walk_manager->global_blocks->get_block(dst);
+    cache_block *run_block = &(cache->cache_blocks[(*(walk_manager->global_blocks))[p].cache_index]);
 
     unsigned seed = (unsigned)(dst + hop + tid + time(NULL));
-    vid_t start_vert = cache->block->start_vert, end_vert = cache->block->start_vert + cache->block->nverts;
+    vid_t start_vert = run_block->block->start_vert, end_vert = run_block->block->start_vert + run_block->block->nverts;
     real_t *weight_start = nullptr, *weight_end = nullptr;
     while (dst >= start_vert && dst < end_vert && hop > 0)
     {
         vid_t off = dst - start_vert;
-        eid_t adj_head = cache->beg_pos[off] - cache->block->start_edge, adj_tail = cache->beg_pos[off + 1] - cache->block->start_edge;
-        if (cache->weights != NULL)
+        eid_t adj_head = run_block->beg_pos[off] - run_block->block->start_edge, adj_tail = run_block->beg_pos[off + 1] - run_block->block->start_edge;
+        if (run_block->weights != NULL)
         {
-            weight_start = cache->weights + adj_head;
-            weight_end = cache->weights + adj_tail;
+            weight_start = run_block->weights + adj_head;
+            weight_end = run_block->weights + adj_tail;
         }
-        graph_context ctx(dst, cache->csr + adj_head, cache->csr + adj_tail, weight_start, weight_end, teleport, walk_manager->nvertices);
+        graph_context ctx(dst, run_block->csr + adj_head, run_block->csr + adj_tail, weight_start, weight_end, teleport, walk_manager->nvertices);
         dst = ctx.transition(sampler, &seed);
         hop--;
     }

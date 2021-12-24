@@ -32,7 +32,7 @@ enum block_state {
 
 class block_t {
 public:
-    bid_t blk;                          /* the block number */
+    bid_t blk, cache_index;             /* the block number, and the memory index */
     vid_t start_vert, nverts;           /* block start vertex and the number of vertex in block */
     eid_t start_edge, nedges;           /* block start edge and the number of edges in this block */
 
@@ -41,7 +41,7 @@ public:
     std::shared_ptr<std::mutex> mtx;    /* mutex for safe update the rank */
 
     block_t() {
-        blk = 0;
+        blk = cache_index = 0;
         start_vert = nverts = 0;
         start_edge = nedges = 0;
         status  = INACTIVE;
@@ -125,6 +125,7 @@ public:
 
         for(bid_t blk = 0; blk < nblocks; blk++) { 
             blocks[blk].blk = blk;
+            blocks[blk].cache_index = nblocks;
             blocks[blk].start_vert = vblocks[blk];
             blocks[blk].nverts     = vblocks[blk+1] - vblocks[blk];
             blocks[blk].start_edge = eblocks[blk];
@@ -160,6 +161,7 @@ public:
         }
         return nblocks;
     }
+
 };
 
 class graph_cache {

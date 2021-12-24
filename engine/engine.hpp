@@ -64,7 +64,7 @@ public:
                 logstream(LOG_DEBUG) << "nverts = " << nverts << ", nedges = " << nedges << std::endl;
                 logstream(LOG_INFO) << "exec_block : " << exec_block << ", walk num : " << nwalks << ", walksum : " << walk_manager->nwalks() << std::endl;
             }
-            exec_block_walk(userprogram, nwalks, run_block, sampler);
+            exec_block_walk(userprogram, nwalks, sampler);
             walk_manager->dump_walks(exec_block);
             run_block->block->status = USED;
             run_count++;
@@ -76,7 +76,7 @@ public:
         logstream(LOG_INFO) << "  ================= FINISHED ======================  " << std::endl;
     }
 
-    void exec_block_walk(randomwalk_t &userprogram, wid_t nwalks, cache_block *run_block, sample_policy_t* sampler) {
+    void exec_block_walk(randomwalk_t &userprogram, wid_t nwalks, sample_policy_t* sampler) {
         if(nwalks < 100) omp_set_num_threads(1);
         else omp_set_num_threads(conf->nthreads);
 
@@ -84,7 +84,7 @@ public:
         {
             #pragma omp parallel for schedule(static)
             for(wid_t idx = 0; idx < nwalks; idx++) {
-                userprogram.update_walk(walk_manager->walks[idx], run_block, walk_manager, sampler);
+                userprogram.update_walk(walk_manager->walks[idx], cache, walk_manager, sampler);
             }
         }
         _m.stop_time("exec_block_walk");
