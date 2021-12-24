@@ -19,10 +19,67 @@ typedef float    real_t;     /* edge weight */
 #define SOURCESHIFT 36    /* source field shift */
 #define SOURCESIZE  28    /* source field size  */
 
-#define WALKER_SOURCE(walker) ((walker >> SOURCESHIFT) & ((0x1 << SOURCESIZE) - 1))
-#define WALKER_POS(walker) ((walker >> POSHIFT) & ((0X1 << POSIZE) - 1))
-#define WALKER_HOP(walker) (walker & ((0x1 << HOPSIZE) - 1))
-#define WALKER_MAKEUP(source, pos, hop) ((((walk_t)source & ((0x1 << SOURCESIZE) - 1)) << SOURCESHIFT) | (((walk_t)pos & ((0x1 << POSIZE) - 1)) << POSHIFT) | ((walk_t)hop & ((0x1 << HOPSIZE) - 1)))
+/**
+ * The following code is initially designed for first order random walk
+*/
+#define WALK_SOURCE(walk) ((walk >> SOURCESHIFT) & ((0x1 << SOURCESIZE) - 1))
+#define WALK_POS(walk) ((walk >> POSHIFT) & ((0X1 << POSIZE) - 1))
+#define WALK_HOP(walk) (walk & ((0x1 << HOPSIZE) - 1))
+#define WALK_MAKEUP(source, pos, hop) ((((walk_t)source & ((0x1 << SOURCESIZE) - 1)) << SOURCESHIFT) | (((walk_t)pos & ((0x1 << POSIZE) - 1)) << POSHIFT) | ((walk_t)hop & ((0x1 << HOPSIZE) - 1)))
 
+enum WalkType { FirstOrder, SecondOrder };
+
+struct empty_data_t
+{
+
+};
+
+/**
+ * This structure stores each walk info, current walk position, hop, source
+ * the data may contain some additional info, e.g. previous vertex
+*/
+template <typename walk_data_t>
+struct walker_t {
+    walk_data_t data;
+    wid_t walk_id;
+    walk_t walk_info;
+};
+
+template <>
+struct walker_t<empty_data_t> {
+    wid_t walk_id;
+    union {
+        walk_t walk_info;
+        empty_data_t data;
+    };
+};
+
+#define WALKER_SOURCE(walker) WALK_SOURCE((walker.walk_info))
+#define WALKER_POS(walker) WALK_POS((walker.walk_info))
+#define WALKER_HOP(walker) WALK_HOP((walker.walk_info))
+#define WALKER_ID(walker) (walker.walk_id)
+
+template<typename walk_data_t>
+inline walker_t<walk_data_t> walker_makeup(walk_data_t data, wid_t id, vid_t source, vid_t pos, hid_t hop) {
+    walker_t<walk_data_t> walk;
+    walk.data = data;
+    walk.walk_id = id;
+    walk.walk_info = WALK_MAKEUP(source, pos, hop);
+    return walk;
+}
+
+
+inline walker_t<empty_data_t> walker_makeup(wid_t id, vid_t source, vid_t pos, hid_t hop)
+{
+    walker_t<empty_data_t> walk;
+    walk.walk_id = id;
+    walk.walk_info = WALK_MAKEUP(source, pos, hop);
+    return walk;
+}
+
+template<typename walk_data_t>
+inline vid_t get_vertex_from_walk(const walk_data_t& data) {
+    return 0;
+}
 
 #endif

@@ -198,4 +198,27 @@ public:
     }
 };
 
+template <typename walk_data_t, WalkType walk_type>
+struct walk_data_block {
+    static bid_t get(const walker_t<walk_data_t> &walker, graph_block *global_blocks) {
+        return 0;
+    }
+};
+
+template <typename walk_data_t>
+struct walk_data_block<walk_data_t, FirstOrder> {
+    static bid_t get(const walker_t<walk_data_t> &walker, graph_block *global_blocks) {
+        return global_blocks->get_block(WALKER_POS(walker));
+    }
+};
+
+template <typename walk_data_t>
+struct walk_data_block<walk_data_t, SecondOrder> {
+    static bid_t get(const walker_t<walk_data_t> &walker, graph_block *global_blocks) {
+        bid_t pblk = global_blocks->get_block(get_vertex_from_walk(walker.data));
+        bid_t cblk = global_blocks->get_block(WALKER_POS(walker));
+        return pblk * global_blocks->nblocks + cblk;
+    }
+};
+
 #endif

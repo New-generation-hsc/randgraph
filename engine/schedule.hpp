@@ -20,57 +20,87 @@ struct rank_compare {
     }
 };
 
+struct walk_scheduler_config_t {
+    graph_config conf;
+    float p;
+};
+
 /** graph_scheduler
  *
  * This file contribute to define the interface how to schedule cache blocks
  */
 
-class scheduler {
+class base_scheduler {
 protected:
     int vertdesc, edgedesc, degdesc, whtdesc;  /* the beg_pos, csr, degree file descriptor */
     metrics &_m;
     bool _weighted;
 
 public:
-    scheduler(graph_config *conf, metrics& m) : _m(m) {
-        std::string beg_pos_name    = get_beg_pos_name(conf->base_name, conf->fnum);
-        std::string csr_name        = get_csr_name(conf->base_name, conf->fnum);
-        std::string degree_name     = get_degree_name(conf->base_name, conf->fnum);
+    base_scheduler(graph_config *conf, metrics& m) : _m(m) {
+        vertdesc = edgedesc = whtdesc = 0;
+        _weighted = false;
+        this->setup(conf);
+    }
+
+    base_scheduler(metrics& m) : _m(m) {
+        vertdesc = edgedesc = whtdesc = 0;
+        _weighted = false;
+    }
+
+    void setup(graph_config *conf) {
+        this->destory();
+
+        std::string beg_pos_name = get_beg_pos_name(conf->base_name, conf->fnum);
+        std::string csr_name = get_csr_name(conf->base_name, conf->fnum);
+        std::string degree_name = get_degree_name(conf->base_name, conf->fnum);
 
         vertdesc = open(beg_pos_name.c_str(), O_RDONLY);
         edgedesc = open(csr_name.c_str(), O_RDONLY);
-        degdesc  = open(degree_name.c_str(), O_RDONLY);
+        degdesc = open(degree_name.c_str(), O_RDONLY);
         _weighted = conf->is_weighted;
 
-        if(_weighted) {
+        if (_weighted)
+        {
             std::string weight_name = get_weights_name(conf->base_name, conf->fnum);
             whtdesc = open(weight_name.c_str(), O_RDONLY);
         }
     }
-    ~scheduler() {
-        close(vertdesc);
-        close(edgedesc);
-        close(degdesc);
+
+    void destory() {
+        if(vertdesc > 0) close(vertdesc);
+        if(edgedesc > 0) close(edgedesc);
+        if(degdesc > 0) close(degdesc);
         if(_weighted) {
             close(_weighted);
         }
     }
-    virtual bid_t schedule(graph_cache& cache, graph_driver& driver, graph_walk &walk_manager) = 0;
 
+    ~base_scheduler() {
+        this->destory();
+    }
 };
 
-class graph_scheduler : public scheduler {
+template <typename Config>
+class graph_scheduler : public base_scheduler {
 private:
     bid_t exec_blk;                   /* the current cache block index used for run */
     bid_t nrblock;                    /* number of cache blocks are used for running */
 public:
-    graph_scheduler(graph_config *conf, metrics &m) : scheduler(conf, m) {
+    graph_scheduler(graph_config *conf, metrics &m) : base_scheduler(conf, m) {
         exec_blk = 0;
         nrblock  = 0;
     }
 
+    graph_scheduler(Config& conf, metrics &m) : base_scheduler(m) {
+        exec_blk = 0;
+        nrblock = 0;
+    }
+
     /** If the cache block has no walk, then swap out all blocks */
-    bid_t schedule(graph_cache& cache, graph_driver& driver, graph_walk &walk_manager) {
+    template <typename walk_data_t, WalkType walk_type>
+    bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager)
+    {
         if(walk_manager.test_finished_cache_walks(&cache)) {
             swap_blocks(cache, driver, walk_manager.global_blocks);
         }
@@ -137,22 +167,37 @@ public:
     }
 };
 
+template <>
+graph_scheduler<graph_config>::graph_scheduler(graph_config& conf, metrics &m) : base_scheduler(m) {
+    base_scheduler::setup(&conf);
+    exec_blk = 0;
+    nrblock = 0;
+}
 
 /**
  * The following schedule scheme follow the graph walker scheme
  */
-class walk_schedule_t : public scheduler {
+template <typename Config>
+class walk_schedule_t : public base_scheduler
+{
 private:
     float prob;
     bid_t exec_blk;
 public:
-    walk_schedule_t(graph_config* conf, float p, metrics &m) : scheduler(conf, m) {
+    walk_schedule_t(graph_config* conf, float p, metrics &m) : base_scheduler(conf, m) {
         // nothing need to initialize
         prob = p;
         exec_blk = 0;
     }
 
-    bid_t schedule(graph_cache& cache, graph_driver& driver, graph_walk &walk_manager) {
+    walk_schedule_t(Config& conf, metrics &m) : base_scheduler(m) {
+        prob = 0;
+        exec_blk = 0;
+    }
+
+    template <typename walk_data_t, WalkType walk_type>
+    bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager)
+    {
         bid_t blk = walk_manager.choose_block(prob);
         if(cache.test_block_cached(blk, exec_blk)) {
             return exec_blk;
@@ -176,7 +221,9 @@ public:
         return exec_blk;
     }
 
-    bid_t swap_block(graph_cache& cache, graph_walk &walk_mangager) {
+    template <typename walk_data_t, WalkType walk_type>
+    bid_t swap_block(graph_cache &cache, graph_walk<walk_data_t, walk_type> &walk_mangager)
+    {
         wid_t walks_cnt = 0xffffffff;
         bid_t blk = 0;
         int life = -1;
@@ -197,6 +244,23 @@ public:
         }
         cache.cache_blocks[blk].life = 0;
         return blk;
+    }
+};
+
+template<>
+walk_schedule_t<walk_scheduler_config_t>::walk_schedule_t(walk_scheduler_config_t& conf, metrics &m) : base_scheduler(m) {
+    base_scheduler::setup(&(conf.conf));
+    prob = conf.p;
+    exec_blk = 0;
+}
+
+template<typename BaseType, typename Config>
+class scheduler : public BaseType {
+public:
+    scheduler(Config &conf, metrics &m) : BaseType(conf, m) { }
+    template <typename walk_data_t, WalkType walk_type>
+    bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager) {
+        return BaseType::schedule(cache, driver, walk_manager);
     }
 };
 

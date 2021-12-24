@@ -31,12 +31,14 @@ public:
         load_block_range(fd, buf, block.nedges, block.start_edge * sizeof(real_t));
     }
 
-    void load_walk(int fd, size_t cnt, graph_buffer<walk_t> &walks) {
+    template<typename walk_data_t>
+    void load_walk(int fd, size_t cnt, graph_buffer<walk_data_t> &walks) {
         load_block_range(fd, walks.buffer_begin(), cnt, 0);
         walks.set_size(cnt);
     }
 
-    void dump_walk(int fd, graph_buffer<walk_t> &walks) {
+    template<typename walk_data_t>
+    void dump_walk(int fd, graph_buffer<walk_data_t> &walks) {
         dump_block_range(fd, walks.buffer_begin(), walks.size(), 0);
         walks.set_size(0);
     }

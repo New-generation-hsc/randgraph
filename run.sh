@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# DATASET="/home/hsc/dataset/twitter/twitter_rv.net"
-DATASET="/home/hsc/dataset/livejournal/w-soc-livejournal.txt"
+DATASET="/home/hsc/dataset/twitter/twitter_rv.net"
+# DATASET="/home/hsc/dataset/livejournal/w-soc-livejournal.txt"
 VERTICES=61578415
 STEPS=100000
 LENGTH=25
@@ -14,4 +14,4 @@ echo "vertices = $VERTICES, steps = $STEPS, length = $LENGTH"
 sudo sync; sudo sh -c '/usr/bin/echo 1 > /proc/sys/vm/drop_caches'
 
 # the random command
-./bin/test/walk $DATASET $1 nmblocks $NMBLOCKS sample reject walks $STEPS length $LENGTH weighted
+./bin/test/walk $DATASET $1 nmblocks $NMBLOCKS sample naive walks $STEPS length $LENGTH

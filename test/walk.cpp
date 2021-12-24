@@ -39,32 +39,23 @@ int main(int argc, const char* argv[]) {
     graph_block blocks(&conf);
     graph_driver driver;
     metrics m("randomwalk");
-    bool is_walk_schedule = get_option_bool("-w");
-    graph_scheduler block_scheduler(&conf, m);
-    walk_schedule_t walk_scheduler(&conf, 0.2, m);
 
-    graph_walk walk_mangager(conf, blocks, driver);
+    graph_walk<empty_data_t, FirstOrder> walk_mangager(conf.base_name, conf.nvertices, conf.nthreads, driver, blocks);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
     int walks = get_option_int("walks", 100000);
     int steps = get_option_int("length", 25);
     graph_cache cache(min_value(nmblocks, blocks.nblocks), conf.blocksize);
 
-    randomwalk_t userprogram(walks, steps, 0.15, m);
-    graph_engine engine(cache, walk_mangager, driver, conf, m);
+    randomwalk_t userprogram(walks, steps, 0.15);
+    graph_engine<empty_data_t, FirstOrder> engine(cache, walk_mangager, driver, conf, m);
 
     naive_sample_t  naive_sampler(m);
     its_sample_t    its_sampler(m);
     alias_sample_t  alias_sampler(m);
     reject_sample_t reject_sampler(m);
 
-    scheduler *scheduler = nullptr;
+    // scheduler *scheduler = nullptr;
     sample_policy_t *sampler = nullptr;
-
-
-    engine.prologue(userprogram);
-    if(is_walk_schedule) scheduler = &walk_scheduler;
-    else scheduler = &block_scheduler;
-
     std::string type = get_option_string("sample", "naive");
     if(type == "its") sampler = &its_sampler;
     else if(type == "alias") sampler = &alias_sampler;
@@ -72,7 +63,13 @@ int main(int argc, const char* argv[]) {
     else sampler = &naive_sampler;
 
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
-    engine.run(userprogram, scheduler, sampler);
+
+    walk_scheduler_config_t walk_config = { conf, 0.2 };
+    scheduler<walk_schedule_t<walk_scheduler_config_t>, walk_scheduler_config_t> walk_scheduler(walk_config, m);
+    // scheduler<graph_scheduler<graph_config>, graph_config> graph_scheduler(conf, m);
+
+    engine.prologue(userprogram);
+    engine.run(userprogram, &walk_scheduler, sampler);
     engine.epilogue(userprogram);
 
     metrics_report(m);
