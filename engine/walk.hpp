@@ -94,8 +94,9 @@ public:
         free(block_walks);
     }
 
-    void move_walk(const walker_t<walk_data_t> &walker, tid_t t)
+    void move_walk(const walker_t<walk_data_t> &walker)
     {
+        tid_t t = static_cast<vid_t>(omp_get_thread_num());
         bid_t blk = walk_data_block<walk_data_t, walk_type>::get(walker, global_blocks);
         if(block_walks[blk][t].full()) {
             persistent_walks(blk, t);
@@ -229,10 +230,20 @@ public:
         return blk;
     }
 
-    void set_max_hop(bid_t blk, hid_t hop) {
+    void set_max_hop(const walker_t<walk_data_t>& walker) {
+        bid_t blk = walk_data_block<walk_data_t, walk_type>::get(walker, global_blocks);
+        hid_t hop = WALKER_HOP(walker);
         #pragma omp critical
         {
             if(maxhops[blk] < hop) maxhops[blk] = hop;
+        }
+    }
+
+    void set_max_hop(bid_t blk, hid_t hop)
+    {
+        #pragma omp critical
+        {
+            if (maxhops[blk] < hop) maxhops[blk] = hop;
         }
     }
 

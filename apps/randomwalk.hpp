@@ -46,7 +46,7 @@ void randomwalk_t::prologue<empty_data_t, FirstOrder>(graph_walk<empty_data_t, F
     {
         vid_t s = rand() % walk_manager->nvertices;
         walker_t<empty_data_t> walker = walker_makeup(idx, s, s, this->steps);
-        walk_manager->move_walk(walker, static_cast<tid_t>(omp_get_thread_num()));
+        walk_manager->move_walk(walker);
     }
 
     for (bid_t blk = 0; blk < total_blocks<FirstOrder>(walk_manager->nblocks); blk++)
@@ -85,8 +85,8 @@ void randomwalk_t::update_walk<empty_data_t, FirstOrder>(const walker_t<empty_da
         bid_t blk = walk_manager->global_blocks->get_block(dst);
         assert(blk < walk_manager->global_blocks->nblocks);
         walker_t<empty_data_t> next_walker = walker_makeup(WALKER_ID(walker), WALKER_SOURCE(walker), dst, hop);
-        walk_manager->move_walk(next_walker, tid);
-        walk_manager->set_max_hop(blk, hop);
+        walk_manager->move_walk(next_walker);
+        walk_manager->set_max_hop(next_walker);
     }
 }
 
