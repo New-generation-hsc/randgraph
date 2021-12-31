@@ -13,6 +13,13 @@ inline vid_t get_vertex_from_walk<vid_t>(const vid_t &data)
     return data;
 }
 
+struct node2vec_conf_t {
+    wid_t numsources;
+    hid_t hops;
+    real_t p, q; 
+    bool weighted;
+};
+
 class node2vec_t {
 private:
     wid_t numsources;
@@ -31,6 +38,17 @@ public:
         weighted = _weighted;
     }
 
+    template<typename AppConfig>
+    node2vec_t(AppConfig& conf) { }
+
+    node2vec_t(node2vec_conf_t& conf) {
+        numsources = conf.numsources;
+        hops = conf.hops;
+        p = conf.p;
+        q = conf.q;
+        weighted = conf.weighted;
+    }
+
     template <typename walk_data_t, WalkType walk_type>
     void prologue(graph_walk<walk_data_t, walk_type> *walk_manager)
     {
@@ -44,6 +62,9 @@ public:
     void epilogue() {
         
     }
+
+    wid_t get_numsources() { return numsources; }
+    hid_t get_hops() { return hops; }
 };
 
 
@@ -84,7 +105,6 @@ void node2vec_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOrder> *wa
 
     for (bid_t blk = 0; blk < total_blocks<SecondOrder>(walk_manager->nblocks); blk++)
     {
-        bid_t p = blk * walk_manager->nblocks + blk;
         walk_manager->set_max_hop(p, this->hops);
     }
 }

@@ -40,7 +40,7 @@ public:
         nblocks = global_blocks->nblocks;
 
         bid_t totblocks = total_blocks<walk_type>(nblocks);
-        maxhops.resize(global_blocks->nblocks, 0);
+        maxhops.resize(totblocks, 0);
 
         block_nmwalk.resize(totblocks);
         for (bid_t blk = 0; blk < totblocks; blk++)
@@ -78,13 +78,6 @@ public:
     {
         for (bid_t blk = 0; blk < total_blocks<walk_type>(this->nblocks); blk++)
         {
-            close(block_desc[blk]);
-            std::string walk_name = get_walk_name(base_name, blk);
-            unlink(walk_name.c_str());
-        }
-
-        for (bid_t blk = 0; blk < total_blocks<walk_type>(this->nblocks); blk++)
-        {
             for (tid_t tid = 0; tid < nthreads; tid++)
             {
                 block_walks[blk][tid].destroy();
@@ -92,6 +85,15 @@ public:
             free(block_walks[blk]);
         }
         free(block_walks);
+    }
+
+    void clear_walks() const {
+        for (bid_t blk = 0; blk < total_blocks<walk_type>(this->nblocks); blk++)
+        {
+            close(block_desc[blk]);
+            std::string walk_name = get_walk_name(base_name, blk);
+            unlink(walk_name.c_str());
+        }
     }
 
     void move_walk(const walker_t<walk_data_t> &walker)
@@ -194,7 +196,7 @@ public:
         std::fill(block_ndwalk[exec_block].begin(), block_ndwalk[exec_block].end(), 0);
         std::fill(block_nmwalk[exec_block].begin(), block_nmwalk[exec_block].end(), 0);
         ftruncate(block_desc[exec_block], 0);
-        global_blocks->reset_rank(exec_block);
+        global_blocks->reset_rank(exec_block % nblocks);
         maxhops[exec_block] = 0;
 
         /* clear the in-memory walks */

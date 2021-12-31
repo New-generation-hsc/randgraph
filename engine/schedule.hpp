@@ -260,6 +260,17 @@ walk_schedule_t<walk_scheduler_config_t>::walk_schedule_t(walk_scheduler_config_
     exec_blk = 0;
 }
 
+template <typename walk_data_t, WalkType walk_type>
+bid_t transform(bid_t pblk, bid_t cblk, graph_walk<walk_data_t, walk_type> &walk_manager)
+{
+    return cblk;
+}
+
+template <>
+bid_t transform<vid_t, SecondOrder>(bid_t pblk, bid_t cblk, graph_walk<vid_t, SecondOrder> &walk_manager)
+{
+    return pblk * walk_manager.global_blocks->nblocks + cblk;
+}
 
 /**
  * The following scheduler is the second-order scheduler
@@ -315,15 +326,6 @@ private:
             driver.load_block_weight(whtdesc, cache.cache_blocks[cache_index].weights, global_blocks->blocks[block_index]);
         }
     }
-
-    template<typename walk_data_t, WalkType walk_type>
-    bid_t transform(bid_t pblk, bid_t cblk, graph_walk<walk_data_t, walk_type>& walk_manager) {
-        return cblk;
-    }
-
-    bid_t transform(bid_t pblk, bid_t cblk, graph_walk<vid_t, SecondOrder>& walk_manager) {
-        return pblk * walk_manager.global_blocks->nblocks + cblk;
-    }
 public:
     second_order_scheduler_t(Config& conf, metrics& m) : base_scheduler(m) {
 
@@ -333,10 +335,15 @@ public:
     bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager) {
         std::pair<bid_t, bid_t> select_blocks = choose_blocks(cache, walk_manager);
         bid_t pblk = select_blocks.first, cblk = select_blocks.second;
+
+#ifdef TESTDEBUG
+        logstream(LOG_DEBUG) << "second-order schedule blocks [" << pblk << ", " << cblk << "]" << std::endl;
+#endif
         
+        _m.start_time("second_order_scheduler_swap_blocks");
         /* increase the cache block life */
         for(bid_t p = 0; p < cache.ncblock; ++p) cache.cache_blocks[p].life++;
-        bid_t p_cache_index = (*(walk_manager.global_blocks))[pblk].cache_index, cache_index = (*(walk_manager.global_blocks))[cblk].cache_index;
+        bid_t p_cache_index = (*(walk_manager.global_blocks))[pblk].cache_index;
         if(p_cache_index != walk_manager.global_blocks->nblocks) {
             cache.cache_blocks[p_cache_index].life = 0;
         }else {
@@ -345,6 +352,7 @@ public:
             load_block_info(cache, driver, walk_manager.global_blocks, new_cache_index, pblk);
         }
 
+        bid_t cache_index = (*(walk_manager.global_blocks))[cblk].cache_index;
         if(cache_index != walk_manager.global_blocks->nblocks) {
             cache.cache_blocks[cache_index].life = 0;
         }else {
@@ -352,7 +360,8 @@ public:
             cache.cache_blocks[new_cache_index].life = 0;
             load_block_info(cache, driver, walk_manager.global_blocks, new_cache_index, cblk);
         }
-        return transform<walk_data_t, walk_type>(pblk, cblk, walk_manager.global_blocks->nblocks);
+        _m.stop_time("second_order_scheduler_swap_blocks");
+        return transform<walk_data_t, walk_type>(pblk, cblk, walk_manager);
     }
 };
 
@@ -361,8 +370,6 @@ second_order_scheduler_t<graph_config>::second_order_scheduler_t(graph_config& c
     setup(&conf);
 }
 
-// template<typename Config>
-// bid_t second_order_scheduler_t<Config>::choose_blocks()
 
 template<typename BaseType, typename Config>
 class scheduler : public BaseType {
@@ -370,7 +377,43 @@ public:
     scheduler(Config &conf, metrics &m) : BaseType(conf, m) { }
     template <typename walk_data_t, WalkType walk_type>
     bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager) {
-        return BaseType::schedule(cache, driver, walk_manager);
+        return 0;
+    }
+};
+
+template <>
+class scheduler<graph_scheduler<graph_config>, graph_config> : public graph_scheduler<graph_config>
+{
+public:
+    scheduler(graph_config &conf, metrics &m) : graph_scheduler<graph_config>(conf, m) {}
+    template <typename walk_data_t, WalkType walk_type>
+    bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager)
+    {
+        return graph_scheduler<graph_config>::schedule(cache, driver, walk_manager);
+    }
+};
+
+template <>
+class scheduler<walk_schedule_t<walk_scheduler_config_t>, walk_scheduler_config_t> : public walk_schedule_t<walk_scheduler_config_t>
+{
+public:
+    scheduler(walk_scheduler_config_t &conf, metrics &m) : walk_schedule_t<walk_scheduler_config_t>(conf, m) {}
+    template <typename walk_data_t, WalkType walk_type>
+    bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager)
+    {
+        return walk_schedule_t<walk_scheduler_config_t>::schedule(cache, driver, walk_manager);
+    }
+};
+
+template <>
+class scheduler<second_order_scheduler_t<graph_config>, graph_config> : public second_order_scheduler_t<graph_config>
+{
+public:
+    scheduler(graph_config &conf, metrics &m) : second_order_scheduler_t<graph_config>(conf, m) {}
+    template <typename walk_data_t, WalkType walk_type>
+    bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager)
+    {
+        return second_order_scheduler_t<graph_config>::schedule(cache, driver, walk_manager);
     }
 };
 

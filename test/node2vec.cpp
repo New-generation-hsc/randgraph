@@ -9,11 +9,12 @@
 #include "logger/logger.hpp"
 #include "util/io.hpp"
 #include "util/util.hpp"
-#include "apps/randomwalk.hpp"
+#include "apps/userprogram.hpp"
 #include "metrics/metrics.hpp"
 #include "metrics/reporter.hpp"
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[])
+{
     assert(argc >= 2);
     set_argc(argc, argv);
     logstream(LOG_INFO) << "app : " << argv[0] << ", dataset : " << argv[1] << std::endl;
@@ -38,36 +39,37 @@ int main(int argc, const char* argv[]) {
 
     graph_block blocks(&conf);
     graph_driver driver;
-    metrics m("randomwalk");
+    metrics m("node2vec");
 
-    graph_walk<empty_data_t, FirstOrder> walk_mangager(conf.base_name, conf.nvertices, conf.nthreads, driver, blocks);
+    graph_walk<vid_t, SecondOrder> walk_mangager(conf.base_name, conf.nvertices, conf.nthreads, driver, blocks);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
     wid_t walks = (wid_t)get_option_int("walks", 100000);
     hid_t steps = (hid_t)get_option_int("length", 25);
     graph_cache cache(min_value(nmblocks, blocks.nblocks), conf.blocksize);
 
-    randomwalk_conf_t app_conf = { walks, steps, 0.15 };
-    userprogram_t<randomwalk_t, randomwalk_conf_t> userprogram(app_conf);
-    graph_engine<empty_data_t, FirstOrder> engine(cache, walk_mangager, driver, conf, m);
+    node2vec_conf_t app_conf = { walks, steps, 0.5, 2, weighted };
+    userprogram_t<node2vec_t, node2vec_conf_t> userprogram(app_conf);
+    graph_engine<vid_t, SecondOrder> engine(cache, walk_mangager, driver, conf, m);
 
-    naive_sample_t  naive_sampler(m);
-    its_sample_t    its_sampler(m);
-    alias_sample_t  alias_sampler(m);
+    its_sample_t its_sampler(m);
+    alias_sample_t alias_sampler(m);
     reject_sample_t reject_sampler(m);
 
     // scheduler *scheduler = nullptr;
     sample_policy_t *sampler = nullptr;
-    std::string type = get_option_string("sample", "naive");
-    if(type == "its") sampler = &its_sampler;
-    else if(type == "alias") sampler = &alias_sampler;
-    else if(type == "reject") sampler = &reject_sampler;
-    else sampler = &naive_sampler;
+    std::string type = get_option_string("sample", "its");
+    if (type == "its")
+        sampler = &its_sampler;
+    else if (type == "alias")
+        sampler = &alias_sampler;
+    else if (type == "reject")
+        sampler = &reject_sampler;
+    else
+        sampler = &its_sampler;
 
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
-    walk_scheduler_config_t walk_config = { conf, 0.2 };
-    scheduler<walk_schedule_t<walk_scheduler_config_t>, walk_scheduler_config_t> walk_scheduler(walk_config, m);
-    // scheduler<graph_scheduler<graph_config>, graph_config> graph_scheduler(conf, m);
+    scheduler<second_order_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, m);
 
     engine.prologue(userprogram);
     engine.run(userprogram, &walk_scheduler, sampler);

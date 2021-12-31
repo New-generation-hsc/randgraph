@@ -3,7 +3,7 @@
 
 #include "cache.hpp"
 #include "schedule.hpp"
-#include "apps/randomwalk.hpp"
+#include "apps/userprogram.hpp"
 #include "util/timer.hpp"
 #include "metrics/metrics.hpp"
 #include "sample.hpp"
@@ -27,7 +27,8 @@ public:
         conf          = &_conf;
     }
 
-    void prologue(randomwalk_t& userprogram) {
+    template<typename AppType, typename AppConfig>
+    void prologue(userprogram_t<AppType, AppConfig>& userprogram) {
         logstream(LOG_INFO) << "  =================  STARTED  ======================  " << std::endl;
         logstream(LOG_INFO) << "Random walks, random generate " << userprogram.get_numsources() << " walks on whole graph, exec_threads = " << conf->nthreads << std::endl;
         logstream(LOG_INFO) << "vertices : " << conf->nvertices << ", edges : " << conf->nedges << std::endl;
@@ -35,11 +36,12 @@ public:
         tid_t exec_threads = conf->nthreads;
         omp_set_num_threads(exec_threads);
 
-        userprogram.prologue<walk_data_t, walk_type>(walk_manager);
+        userprogram.prologue(walk_manager);
     }
 
-    template<typename BaseType, typename Config>
-    void run(randomwalk_t& userprogram, scheduler<BaseType, Config>* block_scheduler, sample_policy_t* sampler) {
+    template <typename BaseType, typename Config, typename AppType, typename AppConfig>
+    void run(userprogram_t<AppType, AppConfig> &userprogram, scheduler<BaseType, Config> *block_scheduler, sample_policy_t *sampler)
+    {
         logstream(LOG_DEBUG) << "graph blocks : " << walk_manager->global_blocks->nblocks << ", memory blocks : " << cache->ncblock << std::endl;
         logstream(LOG_INFO) << "Random walks start executing, please wait for a minute." << std::endl;
         timer.start_time();
@@ -62,7 +64,7 @@ public:
             {
                 logstream(LOG_DEBUG) << timer.runtime() << "s : run count : " << run_count << std::endl;
                 logstream(LOG_DEBUG) << "nverts = " << nverts << ", nedges = " << nedges << std::endl;
-                logstream(LOG_INFO) << "exec_block : " << select_block << ", walk num : " << nwalks << ", walksum : " << walk_manager->nwalks() << std::endl;
+                logstream(LOG_INFO) << "select_block : " << select_block << ", exec_block : " << exec_block << ", walk num : " << nwalks << ", walksum : " << walk_manager->nwalks() << std::endl;
             }
             exec_block_walk(userprogram, nwalks, sampler);
             walk_manager->dump_walks(select_block);
@@ -72,11 +74,16 @@ public:
         logstream(LOG_DEBUG) << timer.runtime() << "s, total run count : " << run_count << std::endl;
     }
 
-    void epilogue(randomwalk_t& userprogram) {
+    template <typename AppType, typename AppConfig>
+    void epilogue(userprogram_t<AppType, AppConfig> &userprogram)
+    {
         logstream(LOG_INFO) << "  ================= FINISHED ======================  " << std::endl;
+        walk_manager->clear_walks(); /* if don't free the descriptor, there will be not enough descriptor to report metrics */
     }
 
-    void exec_block_walk(randomwalk_t &userprogram, wid_t nwalks, sample_policy_t* sampler) {
+    template <typename AppType, typename AppConfig>
+    void exec_block_walk(userprogram_t<AppType, AppConfig> &userprogram, wid_t nwalks, sample_policy_t *sampler)
+    {
         if(nwalks < 100) omp_set_num_threads(1);
         else omp_set_num_threads(conf->nthreads);
 

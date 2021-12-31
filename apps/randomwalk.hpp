@@ -11,6 +11,12 @@
 #include "engine/sample.hpp"
 #include "metrics/metrics.hpp"
 
+struct randomwalk_conf_t {
+    wid_t numsources;
+    hid_t steps;
+    float teleport;
+};
+
 class randomwalk_t {
 protected:
     wid_t numsources;   /* the number of source start to walk */
@@ -22,6 +28,15 @@ public:
         numsources = num;
         steps = hops;
         teleport = prob;
+    }
+
+    template<typename AppConfig>
+    randomwalk_t(AppConfig& conf) { }
+
+    randomwalk_t(randomwalk_conf_t& conf) {
+        numsources = conf.numsources;
+        steps = conf.steps;
+        teleport = conf.teleport;
     }
 
     template <typename walk_data_t, WalkType walk_type>
