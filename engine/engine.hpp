@@ -60,7 +60,7 @@ public:
 
             vid_t nverts = run_block->block->nverts;
             eid_t nedges = run_block->block->nedges;
-            if(run_count % 100 == 0)
+            if(run_count % 1 == 0)
             {
                 logstream(LOG_DEBUG) << timer.runtime() << "s : run count : " << run_count << std::endl;
                 logstream(LOG_DEBUG) << "nverts = " << nverts << ", nedges = " << nedges << std::endl;
@@ -78,7 +78,6 @@ public:
     void epilogue(userprogram_t<AppType, AppConfig> &userprogram)
     {
         logstream(LOG_INFO) << "  ================= FINISHED ======================  " << std::endl;
-        walk_manager->clear_walks(); /* if don't free the descriptor, there will be not enough descriptor to report metrics */
     }
 
     template <typename AppType, typename AppConfig>

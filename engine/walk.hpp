@@ -6,6 +6,19 @@
 #include "api/graph_buffer.hpp"
 #include "cache.hpp"
 
+class block_desc_manager_t {
+private:
+    int desc;
+public:
+    block_desc_manager_t(const std::string&& file_name) {
+        desc = open(file_name.c_str(), O_RDWR | O_CREAT | O_TRUNC | O_APPEND, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
+    }
+    ~block_desc_manager_t() {
+        if(desc > 0) close(desc);
+    }
+    int get_desc() const { return desc; }
+};
+
 template<WalkType walk_type>
 inline bid_t total_blocks(bid_t nblocks) {
     return nblocks;
@@ -29,7 +42,6 @@ public:
     graph_buffer<walker_t<walk_data_t>> **block_walks;  /* the walk resident in memroy */
     std::vector<std::vector<wid_t>> block_nmwalk;       /* record each block number of walks in memroy */
     std::vector<std::vector<wid_t>> block_ndwalk;       /* record each block number of walks in disk */
-    std::vector<int> block_desc;                        /* the descriptor of each block walk file */
     graph_block *global_blocks;
     graph_walk(const std::string& name, vid_t nverts, tid_t threads, graph_driver& driver, graph_block &blocks) {
         base_name = name;
@@ -56,13 +68,6 @@ public:
             std::fill(block_ndwalk[blk].begin(), block_ndwalk[blk].end(), 0);
         }
 
-        block_desc.resize(totblocks);
-        for (bid_t blk = 0; blk < totblocks; blk++)
-        {
-            std::string walk_name = get_walk_name(base_name, blk);
-            block_desc[blk] = open(walk_name.c_str(), O_RDWR | O_CREAT | O_TRUNC | O_APPEND, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
-        }
-
         block_walks = (graph_buffer<walker_t<walk_data_t>> **)malloc(totblocks * sizeof(graph_buffer<walker_t<walk_data_t>> *));
         for (bid_t blk = 0; blk < totblocks; blk++)
         {
@@ -85,14 +90,11 @@ public:
             free(block_walks[blk]);
         }
         free(block_walks);
-    }
 
-    void clear_walks() const {
         for (bid_t blk = 0; blk < total_blocks<walk_type>(this->nblocks); blk++)
         {
-            close(block_desc[blk]);
             std::string walk_name = get_walk_name(base_name, blk);
-            unlink(walk_name.c_str());
+            if(test_exists(walk_name)) unlink(walk_name.c_str());
         }
     }
 
@@ -113,7 +115,8 @@ public:
     {
         block_ndwalk[blk][t] += block_walks[blk][t].size();
         block_nmwalk[blk][t] -= block_walks[blk][t].size();
-        global_driver->dump_walk(block_desc[blk], block_walks[blk][t]);
+        block_desc_manager_t block_desc(get_walk_name(base_name, blk));
+        global_driver->dump_walk(block_desc.get_desc(), block_walks[blk][t]);
         block_walks[blk][t].clear();
     }
 
@@ -175,7 +178,8 @@ public:
     {
         wid_t mwalk_count = this->nmwalks(exec_block), dwalk_count = this->ndwalks(exec_block);
         walks.alloc(mwalk_count + dwalk_count);
-        global_driver->load_walk(block_desc[exec_block], dwalk_count, walks);
+        block_desc_manager_t block_desc(get_walk_name(base_name, exec_block));
+        global_driver->load_walk(block_desc.get_desc(), dwalk_count, walks);
 
         /** load the in-memory */
         for (tid_t t = 0; t < nthreads; t++)
@@ -195,7 +199,8 @@ public:
         walks.destroy();
         std::fill(block_ndwalk[exec_block].begin(), block_ndwalk[exec_block].end(), 0);
         std::fill(block_nmwalk[exec_block].begin(), block_nmwalk[exec_block].end(), 0);
-        ftruncate(block_desc[exec_block], 0);
+        block_desc_manager_t block_desc(get_walk_name(base_name, exec_block));
+        ftruncate(block_desc.get_desc(), 0);
         global_blocks->reset_rank(exec_block % nblocks);
         maxhops[exec_block] = 0;
 

@@ -4,7 +4,8 @@ DATASET="/home/hsc/dataset/twitter/twitter_rv.net"
 # DATASET="/home/hsc/dataset/livejournal/w-soc-livejournal.txt"
 VERTICES=61578415
 STEPS=100000
-LENGTH=25
+# LENGTH=25
+LENGTH=5
 BLOCKSIZE=65536
 NMBLOCKS=16
 
