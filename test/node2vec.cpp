@@ -69,7 +69,8 @@ int main(int argc, const char *argv[])
 
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
-    scheduler<second_order_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, m);
+    // scheduler<second_order_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, m);
+    scheduler<navie_graphwalker_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, m);
 
     engine.prologue(userprogram);
     engine.run(userprogram, &walk_scheduler, sampler);
