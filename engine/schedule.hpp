@@ -455,56 +455,7 @@ public:
     scheduler(Config &conf, metrics &m) : BaseType(conf, m) { }
     template <typename walk_data_t, WalkType walk_type>
     bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager) {
-        logstream(LOG_WARNING) << "you are using a not specialized block scheduler" << std::endl;
         return BaseType::schedule(cache, driver, walk_manager);
-    }
-};
-
-template <>
-class scheduler<graph_scheduler<graph_config>, graph_config> : public graph_scheduler<graph_config>
-{
-public:
-    scheduler(graph_config &conf, metrics &m) : graph_scheduler<graph_config>(conf, m) {}
-    template <typename walk_data_t, WalkType walk_type>
-    bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager)
-    {
-        return graph_scheduler<graph_config>::schedule(cache, driver, walk_manager);
-    }
-};
-
-template <>
-class scheduler<walk_schedule_t<walk_scheduler_config_t>, walk_scheduler_config_t> : public walk_schedule_t<walk_scheduler_config_t>
-{
-public:
-    scheduler(walk_scheduler_config_t &conf, metrics &m) : walk_schedule_t<walk_scheduler_config_t>(conf, m) {}
-    template <typename walk_data_t, WalkType walk_type>
-    bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager)
-    {
-        return walk_schedule_t<walk_scheduler_config_t>::schedule(cache, driver, walk_manager);
-    }
-};
-
-template <>
-class scheduler<second_order_scheduler_t<graph_config>, graph_config> : public second_order_scheduler_t<graph_config>
-{
-public:
-    scheduler(graph_config &conf, metrics &m) : second_order_scheduler_t<graph_config>(conf, m) {}
-    template <typename walk_data_t, WalkType walk_type>
-    bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager)
-    {
-        return second_order_scheduler_t<graph_config>::schedule(cache, driver, walk_manager);
-    }
-};
-
-template <>
-class scheduler<navie_graphwalker_scheduler_t<graph_config>, graph_config> : public navie_graphwalker_scheduler_t<graph_config>
-{
-public:
-    scheduler(graph_config &conf, metrics &m) : navie_graphwalker_scheduler_t<graph_config>(conf, m) {}
-    template <typename walk_data_t, WalkType walk_type>
-    bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager)
-    {
-        return navie_graphwalker_scheduler_t<graph_config>::schedule(cache, driver, walk_manager);
     }
 };
 
