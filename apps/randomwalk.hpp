@@ -44,9 +44,10 @@ public:
     {
     }
 
-    template <typename walk_data_t, WalkType walk_type>
-    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler)
+    template <typename walk_data_t, WalkType walk_type, typename SampleType>
+    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, SampleType *sampler)
     {
+        logstream(LOG_ERROR) << "you are using a generic method." << std::endl;
     }
 
     wid_t get_numsources() { return numsources; }
@@ -71,7 +72,7 @@ void randomwalk_t::prologue<empty_data_t, FirstOrder>(graph_walk<empty_data_t, F
 }
 
 template <>
-void randomwalk_t::update_walk<empty_data_t, FirstOrder>(const walker_t<empty_data_t>& walker, graph_cache *cache, graph_walk<empty_data_t, FirstOrder> *walk_manager, sample_policy_t *sampler)
+void randomwalk_t::update_walk(const walker_t<empty_data_t> &walker, graph_cache *cache, graph_walk<empty_data_t, FirstOrder> *walk_manager, sample_policy_t *sampler)
 {
     tid_t tid = omp_get_thread_num();
     vid_t dst = WALKER_POS(walker);
@@ -91,8 +92,8 @@ void randomwalk_t::update_walk<empty_data_t, FirstOrder>(const walker_t<empty_da
             weight_start = run_block->weights + adj_head;
             weight_end = run_block->weights + adj_tail;
         }
-        graph_context ctx(dst, run_block->csr + adj_head, run_block->csr + adj_tail, weight_start, weight_end, teleport, walk_manager->nvertices);
-        dst = ctx.transition(sampler, &seed);
+        graph_context ctx(dst, walk_manager->nvertices, teleport, run_block->csr + adj_head, run_block->csr + adj_tail, weight_start, weight_end, &seed);
+        dst = vertex_sample(ctx, sampler);
         hop--;
     }
 

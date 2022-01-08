@@ -50,10 +50,10 @@ int main(int argc, const char* argv[]) {
     userprogram_t<randomwalk_t, randomwalk_conf_t> userprogram(app_conf);
     graph_engine<empty_data_t, FirstOrder> engine(cache, walk_mangager, driver, conf, m);
 
-    naive_sample_t  naive_sampler(m);
-    its_sample_t    its_sampler(m);
-    alias_sample_t  alias_sampler(m);
-    reject_sample_t reject_sampler(m);
+    naive_sample_t  naive_sampler;
+    its_sample_t    its_sampler;
+    alias_sample_t  alias_sampler;
+    reject_sample_t reject_sampler;
 
     // scheduler *scheduler = nullptr;
     sample_policy_t *sampler = nullptr;

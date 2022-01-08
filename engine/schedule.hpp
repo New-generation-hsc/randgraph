@@ -13,6 +13,7 @@
 #include "util/util.hpp"
 #include "util/io.hpp"
 #include "metrics/metrics.hpp"
+#include "sample.hpp"
 
 template<typename value_t>
 struct rank_compare {
@@ -36,18 +37,38 @@ class base_scheduler {
 protected:
     int vertdesc, edgedesc, degdesc, whtdesc;  /* the beg_pos, csr, degree file descriptor */
     metrics &_m;
-    bool _weighted;
+    bool _weighted, use_alias, use_acc_weight;
 
 public:
-    base_scheduler(graph_config *conf, metrics& m) : _m(m) {
+    base_scheduler(graph_config *conf, metrics &m) : _m(m)
+    {
         vertdesc = edgedesc = whtdesc = 0;
         _weighted = false;
         this->setup(conf);
+        use_alias = false;
+        use_acc_weight = false;
+    }
+
+    base_scheduler(graph_config *conf, sample_t *sampler, metrics& m) : _m(m) {
+        vertdesc = edgedesc = whtdesc = 0;
+        _weighted = false;
+        this->setup(conf);
+        use_alias = sampler->use_alias;
+        use_acc_weight = sampler->use_acc_weight;
+    }
+
+    base_scheduler(sample_t *sampler, metrics& m) : _m(m) {
+        vertdesc = edgedesc = whtdesc = 0;
+        _weighted = false;
+        use_alias = sampler->use_alias;
+        use_acc_weight = sampler->use_acc_weight;
     }
 
     base_scheduler(metrics& m) : _m(m) {
         vertdesc = edgedesc = whtdesc = 0;
         _weighted = false;
+        use_alias = false;
+        use_acc_weight = false;
     }
 
     void setup(graph_config *conf) {
@@ -107,9 +128,19 @@ private:
     bid_t exec_blk;                   /* the current cache block index used for run */
     bid_t nrblock;                    /* number of cache blocks are used for running */
 public:
-    graph_scheduler(graph_config *conf, metrics &m) : base_scheduler(conf, m) {
+    // graph_scheduler(graph_config *conf, sample_t *sampler, metrics &m) : base_scheduler(conf, sampler, m) {
+    //     exec_blk = 0;
+    //     nrblock  = 0;
+    // }
+
+    // graph_scheduler(graph_config *conf, metrics &m) : base_scheduler(conf, m) {
+    //     exec_blk = 0;
+    //     nrblock  = 0;
+    // }
+
+    graph_scheduler(Config& conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {
         exec_blk = 0;
-        nrblock  = 0;
+        nrblock = 0;
     }
 
     graph_scheduler(Config& conf, metrics &m) : base_scheduler(m) {
@@ -185,6 +216,14 @@ graph_scheduler<graph_config>::graph_scheduler(graph_config& conf, metrics &m) :
     nrblock = 0;
 }
 
+template <>
+graph_scheduler<graph_config>::graph_scheduler(graph_config &conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m)
+{
+    base_scheduler::setup(&conf);
+    exec_blk = 0;
+    nrblock = 0;
+}
+
 /**
  * The following schedule scheme follow the graph walker scheme
  */
@@ -195,13 +234,18 @@ private:
     float prob;
     bid_t exec_blk;
 public:
-    walk_schedule_t(graph_config* conf, float p, metrics &m) : base_scheduler(conf, m) {
-        // nothing need to initialize
-        prob = p;
+    // walk_schedule_t(graph_config* conf, float p, metrics &m) : base_scheduler(conf, m) {
+    //     // nothing need to initialize
+    //     prob = p;
+    //     exec_blk = 0;
+    // }
+
+    walk_schedule_t(Config& conf, metrics &m) : base_scheduler(m) {
+        prob = 0;
         exec_blk = 0;
     }
 
-    walk_schedule_t(Config& conf, metrics &m) : base_scheduler(m) {
+    walk_schedule_t(Config& conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {
         prob = 0;
         exec_blk = 0;
     }
@@ -252,6 +296,13 @@ public:
 
 template<>
 walk_schedule_t<walk_scheduler_config_t>::walk_schedule_t(walk_scheduler_config_t& conf, metrics &m) : base_scheduler(m) {
+    base_scheduler::setup(&(conf.conf));
+    prob = conf.p;
+    exec_blk = 0;
+}
+
+template<>
+walk_schedule_t<walk_scheduler_config_t>::walk_schedule_t(walk_scheduler_config_t& conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {
     base_scheduler::setup(&(conf.conf));
     prob = conf.p;
     exec_blk = 0;
@@ -342,6 +393,7 @@ private:
 
 public:
     navie_graphwalker_scheduler_t(Config& conf, metrics& m) : base_scheduler(m) { }
+    navie_graphwalker_scheduler_t(Config &conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {}
 
     template <typename walk_data_t, WalkType walk_type>
     bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager) {
@@ -365,6 +417,12 @@ template<>
 navie_graphwalker_scheduler_t<graph_config>::navie_graphwalker_scheduler_t(graph_config &conf, metrics &m) : base_scheduler(m) {
     setup(&conf);
 }
+
+template<>
+navie_graphwalker_scheduler_t<graph_config>::navie_graphwalker_scheduler_t(graph_config &conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {
+    setup(&conf);
+}
+
 
 /**
  * The following scheduler is the second-order scheduler
@@ -405,9 +463,8 @@ private:
     }
 
 public:
-    second_order_scheduler_t(Config& conf, metrics& m) : base_scheduler(m) {
-
-    }
+    second_order_scheduler_t(Config& conf, metrics& m) : base_scheduler(m) { }
+    second_order_scheduler_t(Config &conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {}
 
     template <typename walk_data_t, WalkType walk_type>
     bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager) {
@@ -448,11 +505,18 @@ second_order_scheduler_t<graph_config>::second_order_scheduler_t(graph_config& c
     setup(&conf);
 }
 
+template<>
+second_order_scheduler_t<graph_config>::second_order_scheduler_t(graph_config& conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {
+    setup(&conf);
+}
+
 
 template<typename BaseType, typename Config>
 class scheduler : public BaseType {
 public:
     scheduler(Config &conf, metrics &m) : BaseType(conf, m) { }
+    scheduler(Config &conf, sample_t *sampler, metrics &m) : BaseType(conf, sampler, m) {}
+
     template <typename walk_data_t, WalkType walk_type>
     bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager) {
         return BaseType::schedule(cache, driver, walk_manager);

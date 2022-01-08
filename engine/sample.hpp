@@ -10,6 +10,7 @@
 #include <iostream>
 #include "api/types.hpp"
 #include "metrics/metrics.hpp"
+#include "context.hpp"
 
 template <typename iterator_type>
 size_t naive_sample_impl(const iterator_type &first, const iterator_type &last) 
@@ -125,12 +126,22 @@ size_t reject_sample_impl(const iterator_type &first, const iterator_type &last)
     return rand_pos;
 }
 
-class sample_policy_t
-{
-protected:
-    metrics &_m;
+class sample_t {
 public:
-    sample_policy_t(metrics &m) : _m(m) {  }
+    bool use_alias;
+    bool use_acc_weight;
+    sample_t() : use_alias(false), use_acc_weight(false) {}
+    sample_t(bool acc_weight) : use_alias(false), use_acc_weight(acc_weight) {}
+    sample_t(bool alias, bool acc_weight) : use_alias(alias), use_acc_weight(acc_weight) {}
+};
+
+class sample_policy_t : public sample_t
+{
+public:
+    sample_policy_t() {}
+    sample_policy_t(bool acc_weight) : sample_t(acc_weight) {}
+    sample_policy_t(bool alias, bool acc_weight) : sample_t(alias, acc_weight) {}
+
     virtual size_t sample(const std::vector<real_t>& weights) {
         return 0;
     }
@@ -147,7 +158,10 @@ public:
 */
 class naive_sample_t : public sample_policy_t {
 public:
-    naive_sample_t(metrics &m) : sample_policy_t(m) {  }
+    naive_sample_t() {}
+    naive_sample_t(bool acc_weight) : sample_policy_t(acc_weight) {}
+    naive_sample_t(bool alias, bool acc_weight) : sample_policy_t(alias, acc_weight) {}
+
     virtual size_t sample(const std::vector<real_t> &weights)
     {
         return naive_sample_impl(weights.begin(), weights.end());
@@ -169,7 +183,10 @@ public:
 */
 class its_sample_t : public sample_policy_t {
 public:
-    its_sample_t(metrics &m) : sample_policy_t(m) {  }
+    its_sample_t() {}
+    its_sample_t(bool acc_weight) : sample_policy_t(acc_weight) {}
+    its_sample_t(bool alias, bool acc_weight) : sample_policy_t(alias, acc_weight) {}
+
     virtual size_t sample(const std::vector<real_t> &weights)
     {
         return its_sample_impl(weights.begin(), weights.end());
@@ -194,7 +211,10 @@ public:
  */
 class alias_sample_t : public sample_policy_t {
 public:
-    alias_sample_t(metrics &m) : sample_policy_t(m) {  }
+    alias_sample_t() {}
+    alias_sample_t(bool acc_weight) : sample_policy_t(acc_weight) {}
+    alias_sample_t(bool alias, bool acc_weight) : sample_policy_t(alias, acc_weight) {}
+
     virtual size_t sample(const std::vector<real_t> &weights)
     {
         return alias_sample_impl(weights.begin(), weights.end());
@@ -219,7 +239,10 @@ public:
 */
 class reject_sample_t : public sample_policy_t {
 public:
-    reject_sample_t(metrics &m) : sample_policy_t(m) {  }
+    reject_sample_t() {}
+    reject_sample_t(bool acc_weight) : sample_policy_t(acc_weight) {}
+    reject_sample_t(bool alias, bool acc_weight) : sample_policy_t(alias, acc_weight) {}
+
     virtual size_t sample(const std::vector<real_t> &weights)
     {
         return reject_sample_impl(weights.begin(), weights.end());
@@ -235,6 +258,68 @@ public:
     }
 };
 
+class second_order_sample_t : public sample_t {
+public:
+    second_order_sample_t() {}
+    second_order_sample_t(bool acc_weight) : sample_t(acc_weight) {}
+    second_order_sample_t(bool alias, bool acc_weight) : sample_t(alias, acc_weight) {}
+
+    virtual size_t sample(second_order_context *ctx) { return 0; }
+    virtual std::string sample_name() const { return "base_second_order_sample"; }
+};
+
+class second_order_its_sample_t : public second_order_sample_t {
+public:
+    second_order_its_sample_t() {}
+    second_order_its_sample_t(bool acc_weight) : second_order_sample_t(acc_weight) {}
+    second_order_its_sample_t(bool alias, bool acc_weight) : second_order_sample_t(alias, acc_weight) {}
+
+    virtual size_t sample(second_order_context *ctx) {
+        std::vector<real_t> adj_weights;
+        ctx->query_neighbors_weights(adj_weights);
+        its_sample_t sampler;
+        return sampler.sample(adj_weights);
+    }
+    virtual std::string sample_name() const { return "second_order_its_sample"; }
+};
+
+class second_order_alias_sample_t : public second_order_sample_t {
+public:
+    second_order_alias_sample_t() {}
+    second_order_alias_sample_t(bool acc_weight) : second_order_sample_t(acc_weight) {}
+    second_order_alias_sample_t(bool alias, bool acc_weight) : second_order_sample_t(alias, acc_weight) {}
+
+    virtual size_t sample(second_order_context *ctx) {
+        std::vector<real_t> adj_weights;
+        ctx->query_neighbors_weights(adj_weights);
+        alias_sample_t sampler;
+        return sampler.sample(adj_weights);
+    }
+    virtual std::string sample_name() const { return "second_order_alias_sample"; }
+};
+
+class second_order_reject_sample_t : public second_order_sample_t {
+public:
+    second_order_reject_sample_t() {}
+    second_order_reject_sample_t(bool acc_weight) : second_order_sample_t(acc_weight) {}
+    second_order_reject_sample_t(bool alias, bool acc_weight) : second_order_sample_t(alias, acc_weight) {}
+
+    virtual size_t sample(second_order_context *ctx) {
+        std::vector<real_t> adj_weights;
+        ctx->query_neighbors_weights(adj_weights);
+        reject_sample_t sampler;
+        return sampler.sample(adj_weights);
+    }
+    virtual std::string sample_name() const { return "second_order_reject_sample"; }
+};
+
+class second_order_soopt_sample_t : public second_order_sample_t {
+public:
+    virtual size_t sample(second_order_context *ctx) {
+        return 0;
+    }
+};
+
 size_t sample(sample_policy_t* sampler, const std::vector<real_t> & weights) {
     return sampler->sample(weights);
 }
@@ -244,4 +329,51 @@ size_t sample(sample_policy_t *sampler, const real_t* first, const real_t* last)
     return sampler->sample(first, last);
 }
 
+vid_t vertex_sample(graph_context& ctx, sample_policy_t *sampler) {
+    eid_t deg = (eid_t)(ctx.adj_end - ctx.adj_start);
+    if(deg > 0 && (float)rand_r(ctx.local_seed) / RAND_MAX > ctx.teleport) {
+        if(ctx.weight_start == nullptr || ctx.weight_end == nullptr) {
+            vid_t off = (vid_t)rand_r(ctx.local_seed) % deg;
+            return ctx.adj_start[off];
+        }else {
+            size_t off = sample(sampler, ctx.weight_start, ctx.weight_end);
+            return ctx.adj_start[off];
+        }
+    }else {
+        return rand_r(ctx.local_seed) % ctx.nvertices;
+    }
+}
+
+vid_t vertex_sample(second_order_context& ctx, second_order_sample_t *sampler) {
+    eid_t deg = (eid_t)(ctx.adj_end - ctx.adj_start);
+    if(deg > 0) {
+        return sampler->sample(&ctx);
+    } else {
+        return rand_r(ctx.local_seed) % ctx.nvertices;
+    }
+}
+
+template<typename SampleType>
+bool check_use_alias_table(SampleType *sampler) { 
+    logstream(LOG_ERROR) << "you are using a unrecognized sample type." << std::endl;
+    return false; 
+}
+
+template <>
+bool check_use_alias_table(sample_policy_t *sampler) { return sampler->use_alias; }
+
+template <>
+bool check_use_alias_table(second_order_sample_t *sampler) { return sampler->use_alias; }
+
+template<typename SampleType>
+bool check_use_accumulate_weight(SampleType *sampler) { 
+    logstream(LOG_ERROR) << "you are using a unrecognized sample type." << std::endl;
+    return false; 
+}
+
+template <>
+bool check_use_accumulate_weight(sample_policy_t *sampler) { return sampler->use_acc_weight; }
+
+template <>
+bool check_use_accumulate_weight(second_order_sample_t *sampler) { return sampler->use_acc_weight; }
 #endif

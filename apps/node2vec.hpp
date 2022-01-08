@@ -54,9 +54,10 @@ public:
     {
     }
 
-    template <typename walk_data_t, WalkType walk_type>
-    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler)
+    template <typename walk_data_t, WalkType walk_type, typename SampleType>
+    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, SampleType *sampler)
     {
+        logstream(LOG_ERROR) << "you are using a generic method." << std::endl;
     }
 
     void epilogue() {
@@ -68,30 +69,30 @@ public:
 };
 
 
-void node2vec_t::post_query_weights(cache_block *cur_block, vid_t cur_vertex, cache_block *prev_block, vid_t prev_vertex, std::vector<real_t> &adj_weights)
-{
-    vid_t start_vertex = cur_block->block->start_vert, off = cur_vertex - start_vertex;
-    eid_t adj_head = cur_block->beg_pos[off] - cur_block->block->start_edge, adj_tail = cur_block->beg_pos[off + 1] - cur_block->block->start_edge;
-    eid_t deg = adj_tail - adj_head;
-    adj_weights.resize(deg);
+// void node2vec_t::post_query_weights(cache_block *cur_block, vid_t cur_vertex, cache_block *prev_block, vid_t prev_vertex, std::vector<real_t> &adj_weights)
+// {
+//     vid_t start_vertex = cur_block->block->start_vert, off = cur_vertex - start_vertex;
+//     eid_t adj_head = cur_block->beg_pos[off] - cur_block->block->start_edge, adj_tail = cur_block->beg_pos[off + 1] - cur_block->block->start_edge;
+//     eid_t deg = adj_tail - adj_head;
+//     adj_weights.resize(deg);
 
-    start_vertex = prev_block->block->start_vert;
-    off = prev_vertex - start_vertex;
-    eid_t prev_adj_head = prev_block->beg_pos[off] - prev_block->block->start_edge, prev_adj_tail = prev_block->beg_pos[off + 1] - prev_block->block->start_edge;
-    std::unordered_set<vid_t> prev_neighbors(prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail);
-    for(eid_t index = adj_head; index < adj_tail; index++) {
-        if(cur_block->csr[index] == prev_vertex) {
-            if(weighted) adj_weights[index - adj_head] = cur_block->weights[index];
-            else adj_weights[index - adj_head] = 1.0;
-        }else if(prev_neighbors.find(cur_block->csr[index]) != prev_neighbors.end()) {
-            if(weighted) adj_weights[index - adj_head] = 1.0 / p * cur_block->weights[index];
-            else adj_weights[index - adj_head] = 1.0 / p;
-        }else {
-            if(weighted) adj_weights[index - adj_head] = p * cur_block->weights[index];
-            else adj_weights[index - adj_head] = p;
-        }
-    }
-}
+//     start_vertex = prev_block->block->start_vert;
+//     off = prev_vertex - start_vertex;
+//     eid_t prev_adj_head = prev_block->beg_pos[off] - prev_block->block->start_edge, prev_adj_tail = prev_block->beg_pos[off + 1] - prev_block->block->start_edge;
+//     std::unordered_set<vid_t> prev_neighbors(prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail);
+//     for(eid_t index = adj_head; index < adj_tail; index++) {
+//         if(cur_block->csr[index] == prev_vertex) {
+//             if(weighted) adj_weights[index - adj_head] = cur_block->weights[index];
+//             else adj_weights[index - adj_head] = 1.0;
+//         }else if(prev_neighbors.find(cur_block->csr[index]) != prev_neighbors.end()) {
+//             if(weighted) adj_weights[index - adj_head] = 1.0 / p * cur_block->weights[index];
+//             else adj_weights[index - adj_head] = 1.0 / p;
+//         }else {
+//             if(weighted) adj_weights[index - adj_head] = p * cur_block->weights[index];
+//             else adj_weights[index - adj_head] = p;
+//         }
+//     }
+// }
 
 template<>
 void node2vec_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOrder> *walk_manager) {
@@ -110,7 +111,7 @@ void node2vec_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOrder> *wa
 }
 
 template<>
-void node2vec_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &walker, graph_cache *cache, graph_walk<vid_t, SecondOrder> *walk_manager, sample_policy_t *sampler)
+void node2vec_t::update_walk(const walker_t<vid_t> &walker, graph_cache *cache, graph_walk<vid_t, SecondOrder> *walk_manager, second_order_sample_t *sampler)
 {
     tid_t tid = omp_get_thread_num();
     vid_t cur_vertex = WALKER_POS(walker), prev_vertex = get_vertex_from_walk(walker.data);
@@ -127,12 +128,24 @@ void node2vec_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &walker, 
         cache_block *cur_block = &(cache->cache_blocks[cur_cache_index]);
         cache_block *prev_block = &(cache->cache_blocks[prev_cache_index]);
 
-        std::vector<real_t> adj_weights;
-        post_query_weights(cur_block, cur_vertex, prev_block, prev_vertex, adj_weights);
-        vid_t next_vertex;
-        if(adj_weights.empty()) next_vertex = (vid_t)rand_r(&seed) % walk_manager->nvertices;
-        else next_vertex = sample(sampler, adj_weights);
-
+        // std::vector<real_t> adj_weights;
+        // post_query_weights(cur_block, cur_vertex, prev_block, prev_vertex, adj_weights);
+        // vid_t next_vertex;
+        // if(adj_weights.empty()) next_vertex = (vid_t)rand_r(&seed) % walk_manager->nvertices;
+        // else next_vertex = sample(sampler, adj_weights);
+        vid_t start_vertex = cur_block->block->start_vert, off = cur_vertex - start_vertex;
+        eid_t adj_head = cur_block->beg_pos[off] - cur_block->block->start_edge, adj_tail = cur_block->beg_pos[off + 1] - cur_block->block->start_edge;
+        real_t *weight_start = nullptr, *weight_end = nullptr;
+        if(cur_block->weights != nullptr) {
+            weight_start = cur_block->weights + adj_head;
+            weight_end = cur_block->weights + adj_tail;
+        }
+        node2vec_context ctx(cur_vertex, prev_vertex, walk_manager->nvertices, p, q,
+            cur_block->csr +  adj_head, cur_block->csr + adj_tail,
+            prev_block->csr + adj_head, prev_block->csr + adj_tail,
+            weight_start, weight_end, &seed                
+        );
+        vid_t next_vertex = vertex_sample(ctx, sampler);
         prev_vertex = cur_vertex;
         cur_vertex = next_vertex;
 

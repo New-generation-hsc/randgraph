@@ -51,12 +51,12 @@ int main(int argc, const char *argv[])
     userprogram_t<node2vec_t, node2vec_conf_t> userprogram(app_conf);
     graph_engine<vid_t, SecondOrder> engine(cache, walk_mangager, driver, conf, m);
 
-    its_sample_t its_sampler(m);
-    alias_sample_t alias_sampler(m);
-    reject_sample_t reject_sampler(m);
+    second_order_its_sample_t its_sampler;
+    second_order_alias_sample_t alias_sampler;
+    second_order_reject_sample_t reject_sampler;
 
     // scheduler *scheduler = nullptr;
-    sample_policy_t *sampler = nullptr;
+    second_order_sample_t *sampler = nullptr;
     std::string type = get_option_string("sample", "its");
     if (type == "its")
         sampler = &its_sampler;

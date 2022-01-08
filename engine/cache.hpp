@@ -70,6 +70,10 @@ public:
     vid_t *degree;
     vid_t *csr;
     real_t *weights;
+    
+    /* the following two field just for alias table sample method */
+    real_t *prob;
+    real_t *alias;
 
     /**
      * record each block life, when swap out, the largest life block will be evicted

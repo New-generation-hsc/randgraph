@@ -7,10 +7,10 @@
 int main(int argc, const char* argv[]) {
     set_argc(argc, argv);
     metrics m("randomwalk");
-    naive_sample_t naive_sampler(m);
-    its_sample_t its_sampler(m);
-    alias_sample_t alias_sampler(m);
-    reject_sample_t reject_sampler(m);
+    naive_sample_t naive_sampler;
+    its_sample_t its_sampler;
+    alias_sample_t alias_sampler;
+    reject_sample_t reject_sampler;
 
     std::vector<real_t> weights(5);
     for (auto &w : weights) w = static_cast<real_t>(rand()) / static_cast<real_t>(RAND_MAX) * 10.0;
