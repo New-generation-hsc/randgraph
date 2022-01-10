@@ -7,159 +7,220 @@
 #include "api/types.hpp"
 #include "logger/logger.hpp"
 
-/** graph context
- * 
- * This file define when vertex choose the next hop, the tranisition context
- */
+enum CtxType
+{
+    UNBAISEDCONTEXT,        /* the simple first-order context -- unbaised */
+    BIASEDCONTEXT,          /* the baised simple first-order context */
+    SECONDORDERCTX,         /* the simple second-order context -- unbaised */
+    BIASEDSECONDORDERCTX,   /* the baised second-order context */
+    BIASEDACCSECONDORDERCTX /* the baised second-order context, using accmulute weight */
+};
 
-class context {
+class context
+{
 public:
     vid_t cur_vertex;
     vid_t nvertices;
     vid_t *adj_start, *adj_end;
-    real_t *weight_start, *weight_end;
     unsigned *local_seed;
 
-    /* the preprocessed alias table for fast selection */
-    real_t *prob;
-    vid_t  *alias;
-
-    context(vid_t _pos, vid_t _nvertices, vid_t *_adj_start, vid_t *_adj_end, real_t *_weight_start, real_t *_weight_end, unsigned *seed)
+    context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed)
     {
-        this->cur_vertex = _pos;
-        this->adj_start = _adj_start;
-        this->adj_end = _adj_end;
-        this->weight_start = _weight_start;
-        this->weight_end = _weight_end;
-        this->nvertices = _nvertices;
+        this->cur_vertex = vertex;
+        this->nvertices = num_vertices;
+        this->adj_start = start,
+        this->adj_end = end;
         this->local_seed = seed;
-        this->prob = nullptr;
-        this->alias = nullptr;
-    }
-
-    void set_alias_table(real_t *pre_prob, vid_t *pre_alias) {
-        assert(pre_prob != nullptr && pre_alias != nullptr);
-        this->prob = pre_prob;
-        this->alias = pre_alias;
     }
 };
 
+template <CtxType ctx_type>
+class walk_context : public context
+{
+public:
+    walk_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed) : context(vertex, num_vertices, start, end, seed)
+    {
+    }
+};
 
-class graph_context : public context {
+template <>
+class walk_context<UNBAISEDCONTEXT> : public context
+{
 public:
     float teleport;
-
-    graph_context(vid_t _pos, vid_t _nvertices, float _teleport,
-                  vid_t *_adj_start, vid_t *_adj_end, 
-                  real_t *_weight_start, real_t *_weight_end, 
-                  unsigned *seed
-                 ) : context(_pos, _nvertices, _adj_start, _adj_end, _weight_start, _weight_end, seed)
+    walk_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed, float p) : context(vertex, num_vertices, start, end, seed)
     {
-        this->teleport = _teleport;
+        this->teleport = p;
     }
 };
 
+template <>
+class walk_context<BIASEDCONTEXT> : public context
+{
+public:
+    float teleport;
+    real_t *weight_start, *weight_end;
+    walk_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                 real_t *wht_start, real_t *wht_end, float p) : context(vertex, num_vertices, start, end, seed)
+    {
+        this->teleport = p;
+        this->weight_start = wht_start;
+        this->weight_end = wht_end;
+    }
+};
 
-class second_order_context : public context {
+template <>
+class walk_context<SECONDORDERCTX> : public context
+{
 public:
     vid_t prev_vertex;
     vid_t *prev_adj_start, *prev_adj_end;
-    real_t *prev_weight_start, *prev_weight_end;
-
-    second_order_context(vid_t cur, vid_t prev, vid_t num_vertices,
-                         vid_t *adj_s, vid_t *adj_e,
-                         vid_t *p_adj_s, vid_t *p_adj_e,
-                         real_t *wht_s, real_t *wht_e,
-                         unsigned *seed
-                        ) : context(cur, num_vertices, adj_s, adj_e, wht_s, wht_e, seed)
+    walk_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                 vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e) : context(vertex, num_vertices, start, end, seed)
     {
         this->prev_vertex = prev;
         this->prev_adj_start = p_adj_s;
         this->prev_adj_end = p_adj_e;
     }
-
-    virtual void query_neighbors_weights(std::vector<real_t> &adj_weights) { }
-    virtual void query_common_neighbors_weights(std::vector<real_t> &comm_adj_weights, std::vector<vid_t> &comm_neighbors) { }
 };
 
-class node2vec_context : public second_order_context {
+template <>
+class walk_context<BIASEDSECONDORDERCTX> : public context
+{
 public:
-    real_t p, q;
+    vid_t prev_vertex;
+    vid_t *prev_adj_start, *prev_adj_end;
+    real_t *weight_start, *weight_end;
 
-    node2vec_context(vid_t cur, vid_t prev, vid_t num_vertices, 
-                     real_t param_p, real_t param_q,
-                     vid_t *adj_s, vid_t *adj_e,
-                     vid_t *p_adj_s, vid_t *p_adj_e,
-                     real_t *wht_s, real_t *wht_e,
-                     unsigned *seed
-    ) : second_order_context(cur, prev, num_vertices, adj_s, adj_e, p_adj_s, p_adj_e, wht_s, wht_e, seed) 
+    walk_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                 vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, real_t *wht_start, real_t *wht_end) : context(vertex, num_vertices, start, end, seed)
+    {
+        this->prev_vertex = prev;
+        this->prev_adj_start = p_adj_s;
+        this->prev_adj_end = p_adj_e;
+        this->weight_start = wht_start;
+        this->weight_end = wht_end;
+    }
+};
+
+template <>
+class walk_context<BIASEDACCSECONDORDERCTX> : public context
+{
+public:
+    vid_t prev_vertex;
+    vid_t *prev_adj_start, *prev_adj_end;
+    real_t *acc_weight_start, *acc_weight_end;
+
+    walk_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                 vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, real_t *acc_wht_start, real_t *acc_wht_end) : context(vertex, num_vertices, start, end, seed)
+    {
+        this->prev_vertex = prev;
+        this->prev_adj_start = p_adj_s;
+        this->prev_adj_end = p_adj_e;
+        this->acc_weight_start = acc_wht_start;
+        this->acc_weight_end = acc_wht_end;
+    }
+};
+
+template <CtxType ctx_type>
+class node2vec_context : public walk_context<ctx_type>
+{
+public:
+    node2vec_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                     vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e) : walk_context<ctx_type>(vertex, num_vertices, start, end, seed)
+    {
+        logstream(LOG_ERROR) << "you should use a specialized node2vec context" << std::endl;
+    }
+
+};
+
+template <>
+class node2vec_context<SECONDORDERCTX> : public walk_context<SECONDORDERCTX>
+{
+public:
+    float p, q;
+    node2vec_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                     vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, float param_p, float param_q) : walk_context<SECONDORDERCTX>(vertex, num_vertices, start, end, seed, prev, p_adj_s, p_adj_e)
     {
         this->p = param_p;
         this->q = param_q;
     }
 
-    virtual void query_neighbors_weights(std::vector<real_t>& adj_weights) {
+    void query_neigbors_weight(std::vector<real_t> &adj_weights)
+    {
         size_t deg = static_cast<size_t>(adj_end - adj_start);
         adj_weights.resize(deg);
         std::unordered_set<vid_t> prev_neighbors(prev_adj_start, prev_adj_end);
         for(size_t index = 0; index < deg; ++index) {
             if(*(adj_start + index) == prev_vertex) {
-                if(weight_start == nullptr || weight_end == nullptr) adj_weights[index] = 1.0;
-                else adj_weights[index] = *(weight_start + index);
+                adj_weights[index] = 1.0;
             }else if(prev_neighbors.find(*(adj_start + index)) != prev_neighbors.end()) {
-                if(weight_start == nullptr || weight_end == nullptr) adj_weights[index] = 1.0 / p;
-                else adj_weights[index] = *(weight_start + index) / p;
+                adj_weights[index] = 1.0 / p;
             }else {
-                if(weight_start == nullptr || weight_end == nullptr) adj_weights[index] = 1.0 / q;
-                else adj_weights[index] = *(weight_start + index) / q;
-            }
-        }
-    }
-
-    virtual void query_common_neighbors_weights(std::vector<real_t>& comm_adj_weights, std::vector<vid_t>& comm_neighbors) {
-        size_t deg = static_cast<size_t>(adj_end - adj_start);
-        std::unordered_set<vid_t> prev_neighbors(prev_adj_start, prev_adj_end);
-        for (size_t index = 0; index < deg; ++index)
-        {
-            if (*(adj_start + index) == prev_vertex)
-            {
-                if (weight_start == nullptr || weight_end == nullptr) {
-                    comm_adj_weights.push_back(1.0);
-                    comm_neighbors.push_back(*(adj_start + index));
-                }
-                else {
-                    comm_adj_weights.push_back(*(weight_start + index));
-                    comm_neighbors.push_back(*(adj_start + index));
-                }
-            }
-            else if (prev_neighbors.find(*(adj_start + index)) != prev_neighbors.end())
-            {
-                if (weight_start == nullptr || weight_end == nullptr) {
-                    comm_adj_weights.push_back(1.0 / p);
-                    comm_neighbors.push_back(*(adj_start + index));
-                }
-                else {
-                    comm_adj_weights.push_back(*(weight_start + index) / p);
-                    comm_neighbors.push_back(*(adj_start + index));
-                }
+                adj_weights[index] = 1.0 / q;
             }
         }
     }
 };
 
-class autoregressive_context : public second_order_context {
+template <>
+class node2vec_context<BIASEDSECONDORDERCTX> : public walk_context<BIASEDSECONDORDERCTX>
+{
 public:
-    real_t alpha;
-
-    autoregressive_context(vid_t cur, vid_t prev, vid_t num_vertices,
-                           real_t param_alpha,
-                           vid_t *adj_s, vid_t *adj_e,
-                           vid_t *p_adj_s, vid_t *p_adj_e,
-                           real_t *wht_s, real_t *wht_e,
-                           unsigned *seed
-    ) : second_order_context(cur, prev, num_vertices, adj_s, adj_e, p_adj_s, p_adj_e, wht_s, wht_e, seed)
+    float p, q;
+    node2vec_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                     vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, real_t *wht_start, real_t *wht_end, float param_p, float param_q) : walk_context<BIASEDSECONDORDERCTX>(vertex, num_vertices, start, end, seed, prev, p_adj_s, p_adj_e, wht_start, wht_end)
     {
-        this->alpha = param_alpha;
+        this->p = param_p;
+        this->q = param_q;
+    }
+
+    void query_neigbors_weight(std::vector<real_t> &adj_weights)
+    {
+        size_t deg = static_cast<size_t>(adj_end - adj_start);
+        adj_weights.resize(deg);
+        std::unordered_set<vid_t> prev_neighbors(prev_adj_start, prev_adj_end);
+        for(size_t index = 0; index < deg; ++index) {
+            if(*(adj_start + index) == prev_vertex) {
+                adj_weights[index] = *(weight_start + index);
+            }else if(prev_neighbors.find(*(adj_start + index)) != prev_neighbors.end()) {
+                adj_weights[index] = *(weight_start + index) / p;
+            }else {
+                adj_weights[index] = *(weight_start + index) / q;
+            }
+        }
+    }
+};
+
+template <>
+class node2vec_context<BIASEDACCSECONDORDERCTX> : public walk_context<BIASEDACCSECONDORDERCTX>
+{
+public:
+    float p, q;
+    node2vec_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                     vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, real_t *acc_wht_start, real_t *acc_wht_end, float param_p, float param_q) : walk_context<BIASEDACCSECONDORDERCTX>(vertex, num_vertices, start, end, seed, prev, p_adj_s, p_adj_e, acc_wht_start, acc_wht_end)
+    {
+        this->p = param_p;
+        this->q = param_q;
+    }
+
+    void query_neigbors_weight(std::vector<real_t> &adj_weights)
+    {
+        size_t deg = static_cast<size_t>(adj_end - adj_start);
+        adj_weights.resize(deg);
+        std::unordered_set<vid_t> prev_neighbors(prev_adj_start, prev_adj_end);
+        for(size_t index = 0; index < deg; ++index) {
+            if(*(adj_start + index) == prev_vertex) {
+                if(index == 0) adj_weights[index] = *acc_weight_start;
+                else adj_weights[index] = *(acc_weight_start + index) - *(acc_weight_start + index - 1);
+            }else if(prev_neighbors.find(*(adj_start + index)) != prev_neighbors.end()) {
+                if(index == 0) adj_weights[index] = (*acc_weight_start) / p;
+                else adj_weights[index] = (*(acc_weight_start + index) - *(acc_weight_start + index - 1)) / p;
+            }else {
+                if(index == 0) adj_weights[index] = (*acc_weight_start) / q;
+                else adj_weights[index] = (*(acc_weight_start + index) - *(acc_weight_start + index - 1)) / q;
+            }
+        }
     }
 };
 

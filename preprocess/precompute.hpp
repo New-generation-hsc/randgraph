@@ -141,7 +141,7 @@ void second_order_precompute(const std::string& filename, int fnum, size_t block
         block.csr     = (vid_t*)realloc(block.csr, block.nedges * sizeof(vid_t));
         block.weights = (real_t*)realloc(block.weights, block.nedges * sizeof(real_t));
         table.prob    = (real_t*)realloc(table.prob, block.nedges * sizeof(real_t));
-        table.alias   = (vid_t*)realloc(table.alias, block.nedges * sizeof(real_t));
+        table.alias   = (vid_t*)realloc(table.alias, block.nedges * sizeof(vid_t));
         acw           = (real_t*)realloc(acw, block.nedges * sizeof(real_t));
         
         construct_alias_table(block, table);

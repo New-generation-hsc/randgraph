@@ -17,7 +17,7 @@ int main(int argc, const char* argv[]) {
     for(const auto & w : weights) std::cout << w << " ";
     std::cout << std::endl;
 
-    sample(&its_sampler, weights);
-    sample(&alias_sampler, weights);
+    its_sampler.sample(weights);
+    alias_sampler.sample(weights);
     return 0;
 }

@@ -36,6 +36,7 @@ struct walk_scheduler_config_t {
 class base_scheduler {
 protected:
     int vertdesc, edgedesc, degdesc, whtdesc;  /* the beg_pos, csr, degree file descriptor */
+    int prob_desc, alias_desc, acc_wht_desc; /* the alias table descriptor and accumulate weight descriptor */
     metrics &_m;
     bool _weighted, use_alias, use_acc_weight;
 
@@ -43,22 +44,25 @@ public:
     base_scheduler(graph_config *conf, metrics &m) : _m(m)
     {
         vertdesc = edgedesc = whtdesc = 0;
+        prob_desc = alias_desc = acc_wht_desc = 0;
         _weighted = false;
-        this->setup(conf);
         use_alias = false;
         use_acc_weight = false;
+        this->setup(conf);
     }
 
     base_scheduler(graph_config *conf, sample_t *sampler, metrics& m) : _m(m) {
         vertdesc = edgedesc = whtdesc = 0;
+        prob_desc = alias_desc = acc_wht_desc = 0;
         _weighted = false;
-        this->setup(conf);
         use_alias = sampler->use_alias;
         use_acc_weight = sampler->use_acc_weight;
+        this->setup(conf);
     }
 
     base_scheduler(sample_t *sampler, metrics& m) : _m(m) {
         vertdesc = edgedesc = whtdesc = 0;
+        prob_desc = alias_desc = acc_wht_desc = 0;
         _weighted = false;
         use_alias = sampler->use_alias;
         use_acc_weight = sampler->use_acc_weight;
@@ -66,6 +70,7 @@ public:
 
     base_scheduler(metrics& m) : _m(m) {
         vertdesc = edgedesc = whtdesc = 0;
+        prob_desc = alias_desc = acc_wht_desc = 0;
         _weighted = false;
         use_alias = false;
         use_acc_weight = false;
@@ -85,8 +90,19 @@ public:
 
         if (_weighted)
         {
-            std::string weight_name = get_weights_name(conf->base_name, conf->fnum);
-            whtdesc = open(weight_name.c_str(), O_RDONLY);
+            if(use_alias) {
+                std::string prob_name = get_prob_name(conf->base_name, conf->fnum);
+                prob_desc = open(prob_name.c_str(), O_RDONLY);
+                std::string alias_name = get_alias_name(conf->base_name, conf->fnum);
+                alias_desc = open(alias_name.c_str(), O_RDONLY);
+            }
+            if(use_acc_weight) {
+                std::string acc_weight_name = get_accumulate_name(conf->base_name, conf->fnum);
+                acc_wht_desc = open(acc_weight_name.c_str(), O_RDONLY);
+            } else {
+                std::string weight_name = get_weights_name(conf->base_name, conf->fnum);
+                whtdesc = open(weight_name.c_str(), O_RDONLY);
+            }
         }
     }
 
@@ -103,8 +119,20 @@ public:
         driver.load_block_edge(edgedesc, cache.cache_blocks[cache_index].csr, global_blocks->blocks[block_index]);
         if (_weighted)
         {
-            cache.cache_blocks[cache_index].weights = (real_t *)realloc(cache.cache_blocks[cache_index].weights, global_blocks->blocks[block_index].nedges * sizeof(real_t));
-            driver.load_block_weight(whtdesc, cache.cache_blocks[cache_index].weights, global_blocks->blocks[block_index]);
+            if(use_alias) {
+                cache.cache_blocks[cache_index].prob = (real_t *)realloc(cache.cache_blocks[cache_index].prob, global_blocks->blocks[block_index].nedges * sizeof(real_t));
+                driver.load_block_prob(prob_desc, cache.cache_blocks[cache_index].prob, global_blocks->blocks[block_index]);
+                cache.cache_blocks[cache_index].alias = (vid_t*)realloc(cache.cache_blocks[cache_index].alias, global_blocks->blocks[block_index].nedges * sizeof(vid_t));
+                driver.load_block_alias(alias_desc, cache.cache_blocks[cache_index].alias, global_blocks->blocks[block_index]);
+            }
+
+            if(use_acc_weight) {
+                cache.cache_blocks[cache_index].acc_weights = (real_t *)realloc(cache.cache_blocks[cache_index].acc_weights, global_blocks->blocks[block_index].nedges * sizeof(real_t));
+                driver.load_block_weight(acc_wht_desc, cache.cache_blocks[cache_index].acc_weights, global_blocks->blocks[block_index]);
+            } else {
+                cache.cache_blocks[cache_index].weights = (real_t *)realloc(cache.cache_blocks[cache_index].weights, global_blocks->blocks[block_index].nedges * sizeof(real_t));
+                driver.load_block_weight(whtdesc, cache.cache_blocks[cache_index].weights, global_blocks->blocks[block_index]);
+            }
         }
     }
 
@@ -113,7 +141,13 @@ public:
         if(edgedesc > 0) close(edgedesc);
         if(degdesc > 0) close(degdesc);
         if(_weighted) {
-            close(_weighted);
+            if(use_alias) {
+                close(prob_desc);
+                close(alias_desc);
+            }
+
+            if(use_acc_weight) close(acc_wht_desc);
+            else close(whtdesc);
         }
     }
 
@@ -128,15 +162,6 @@ private:
     bid_t exec_blk;                   /* the current cache block index used for run */
     bid_t nrblock;                    /* number of cache blocks are used for running */
 public:
-    // graph_scheduler(graph_config *conf, sample_t *sampler, metrics &m) : base_scheduler(conf, sampler, m) {
-    //     exec_blk = 0;
-    //     nrblock  = 0;
-    // }
-
-    // graph_scheduler(graph_config *conf, metrics &m) : base_scheduler(conf, m) {
-    //     exec_blk = 0;
-    //     nrblock  = 0;
-    // }
 
     graph_scheduler(Config& conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {
         exec_blk = 0;
@@ -234,11 +259,6 @@ private:
     float prob;
     bid_t exec_blk;
 public:
-    // walk_schedule_t(graph_config* conf, float p, metrics &m) : base_scheduler(conf, m) {
-    //     // nothing need to initialize
-    //     prob = p;
-    //     exec_blk = 0;
-    // }
 
     walk_schedule_t(Config& conf, metrics &m) : base_scheduler(m) {
         prob = 0;

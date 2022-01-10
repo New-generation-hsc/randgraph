@@ -51,12 +51,13 @@ int main(int argc, const char *argv[])
     userprogram_t<node2vec_t, node2vec_conf_t> userprogram(app_conf);
     graph_engine<vid_t, SecondOrder> engine(cache, walk_mangager, driver, conf, m);
 
-    second_order_its_sample_t its_sampler;
-    second_order_alias_sample_t alias_sampler;
-    second_order_reject_sample_t reject_sampler;
+    naive_sample_t naive_sampler;
+    its_sample_t its_sampler;
+    alias_sample_t alias_sampler;
+    reject_sample_t reject_sampler;
 
     // scheduler *scheduler = nullptr;
-    second_order_sample_t *sampler = nullptr;
+    sample_policy_t *sampler = nullptr;
     std::string type = get_option_string("sample", "its");
     if (type == "its")
         sampler = &its_sampler;
@@ -70,7 +71,7 @@ int main(int argc, const char *argv[])
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
     // scheduler<second_order_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, m);
-    scheduler<navie_graphwalker_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, m);
+    scheduler<navie_graphwalker_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, sampler, m);
 
     engine.prologue(userprogram);
     engine.run(userprogram, &walk_scheduler, sampler);

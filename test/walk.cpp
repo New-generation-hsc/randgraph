@@ -66,7 +66,7 @@ int main(int argc, const char* argv[]) {
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
     walk_scheduler_config_t walk_config = { conf, 0.2 };
-    scheduler<walk_schedule_t<walk_scheduler_config_t>, walk_scheduler_config_t> walk_scheduler(walk_config, m);
+    scheduler<walk_schedule_t<walk_scheduler_config_t>, walk_scheduler_config_t> walk_scheduler(walk_config, sampler, m);
     // scheduler<graph_scheduler<graph_config>, graph_config> graph_scheduler(conf, m);
 
     engine.prologue(userprogram);

@@ -73,7 +73,8 @@ public:
     
     /* the following two field just for alias table sample method */
     real_t *prob;
-    real_t *alias;
+    vid_t  *alias;
+    real_t *acc_weights;
 
     /**
      * record each block life, when swap out, the largest life block will be evicted
@@ -86,6 +87,9 @@ public:
         degree  = NULL;
         csr     = NULL;
         weights = NULL;
+        prob    = NULL;
+        alias   = NULL;
+        acc_weights = NULL;
         life = 0;
     }
 
@@ -94,6 +98,9 @@ public:
         if(degree)  free(degree);
         if(csr)     free(csr);
         if(weights) free(weights);
+        if(prob)    free(prob);
+        if(alias)   free(alias);
+        if(acc_weights) free(acc_weights);
     }
 };
 

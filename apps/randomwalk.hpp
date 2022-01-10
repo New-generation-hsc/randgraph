@@ -82,18 +82,17 @@ void randomwalk_t::update_walk(const walker_t<empty_data_t> &walker, graph_cache
 
     unsigned seed = (unsigned)(dst + hop + tid + time(NULL));
     vid_t start_vert = run_block->block->start_vert, end_vert = run_block->block->start_vert + run_block->block->nverts;
-    real_t *weight_start = nullptr, *weight_end = nullptr;
     while (dst >= start_vert && dst < end_vert && hop > 0)
     {
         vid_t off = dst - start_vert;
         eid_t adj_head = run_block->beg_pos[off] - run_block->block->start_edge, adj_tail = run_block->beg_pos[off + 1] - run_block->block->start_edge;
-        if (run_block->weights != NULL)
-        {
-            weight_start = run_block->weights + adj_head;
-            weight_end = run_block->weights + adj_tail;
+        if (run_block->weights == NULL) {
+            walk_context<UNBAISEDCONTEXT> ctx(dst, walk_manager->nvertices, run_block->csr + adj_head, run_block->csr + adj_tail, &seed, teleport);
+            dst = vertex_sample(ctx, sampler);
+        } else {
+            walk_context<BIASEDCONTEXT> ctx(dst, walk_manager->nvertices, run_block->csr + adj_head, run_block->csr + adj_tail, &seed, run_block->weights + adj_head, run_block->weights + adj_tail, teleport);
+            dst = vertex_sample(ctx, sampler);
         }
-        graph_context ctx(dst, walk_manager->nvertices, teleport, run_block->csr + adj_head, run_block->csr + adj_tail, weight_start, weight_end, &seed);
-        dst = vertex_sample(ctx, sampler);
         hop--;
     }
 
