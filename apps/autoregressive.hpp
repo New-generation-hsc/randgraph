@@ -1,30 +1,22 @@
-#ifndef _GRAPH_NODE2VEC_H_
-#define _GRAPH_NODE2VEC_H_
+#ifndef _GRAPH_AUTOREGRESSIVE_H_
+#define _GRAPH_AUTOREGRESSIVE_H_
 
-#include <omp.h>
-#include <unordered_set>
 #include "api/types.hpp"
-#include "engine/walk.hpp"
-#include "engine/sample.hpp"
+#include "userprogram.hpp"
 #include "engine/context.hpp"
 
-template <>
-inline vid_t get_vertex_from_walk<vid_t>(const vid_t &data)
+struct autoregressive_conf_t
 {
-    return data;
-}
-
-struct node2vec_conf_t {
     wid_t numsources;
     hid_t hops;
-    real_t p, q;
+    real_t alpha;
 };
 
 template <typename SampleType>
-class update_strategy_t<node2vec_conf_t, vid_t, SecondOrder, SampleType>
+class update_strategy_t<autoregressive_conf_t, vid_t, SecondOrder, SampleType>
 {
 public:
-    static void update_walk(const node2vec_conf_t &conf, const walker_t<vid_t> &walker, graph_cache *cache, graph_walk<vid_t, SecondOrder> *walk_manager, SampleType *sampler)
+    static void update_walk(const autoregressive_conf_t &conf, const walker_t<vid_t> &walker, graph_cache *cache, graph_walk<vid_t, SecondOrder> *walk_manager, SampleType *sampler)
     {
         tid_t tid = omp_get_thread_num();
         vid_t cur_vertex = WALKER_POS(walker), prev_vertex = get_vertex_from_walk(walker.data);
@@ -37,7 +29,8 @@ public:
         bid_t nblocks = walk_manager->global_blocks->nblocks;
         assert(cur_cache_index != nblocks && prev_cache_index != nblocks);
 
-        while (cur_cache_index != nblocks && hop > 0) {
+        while (cur_cache_index != nblocks && hop > 0)
+        {
             cache_block *cur_block = &(cache->cache_blocks[cur_cache_index]);
             cache_block *prev_block = &(cache->cache_blocks[prev_cache_index]);
 
@@ -47,26 +40,34 @@ public:
             eid_t prev_adj_head = prev_block->beg_pos[prev_off] - prev_block->block->start_edge, prev_adj_tail = prev_block->beg_pos[prev_off + 1] - prev_block->block->start_edge;
 
             vid_t next_vertex = 0;
-            if(cur_block->weights == nullptr && cur_block->acc_weights == nullptr) {
-                node2vec_context<SECONDORDERCTX> ctx(cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
-                                                     &seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail, conf.p, conf.q);
+            if (cur_block->weights == nullptr && cur_block->acc_weights == nullptr)
+            {
+                autoregressive_context<SECONDORDERCTX> ctx(cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
+                                                     &seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail, conf.alpha);
                 next_vertex = vertex_sample(ctx, sampler);
-            } else {
-                if(sampler->use_alias && sampler->use_acc_weight) {
-                    node2vec_context<BIASEDACCSECONDORDERCTX> ctx(cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
-                                                                  &seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail,
-                                                                  cur_block->acc_weights + adj_head, cur_block->acc_weights + adj_tail, 
-                                                                  cur_block->prob, cur_block->alias, conf.p, conf.q);
+            }
+            else
+            {
+                if (sampler->use_alias && sampler->use_acc_weight)
+                {
+                    autoregressive_context<BIASEDACCSECONDORDERCTX> ctx(cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
+                                                                        &seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail,
+                                                                        cur_block->acc_weights + adj_head, cur_block->acc_weights + adj_tail,
+                                                                        cur_block->prob, cur_block->alias, conf.alpha, prev_block->acc_weights + prev_adj_head, prev_block->acc_weights + prev_adj_tail);
                     next_vertex = vertex_sample(ctx, sampler);
-                } else if (sampler->use_acc_weight) {
-                    node2vec_context<BIASEDACCSECONDORDERCTX> ctx(cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
-                                                                  &seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail,
-                                                                  cur_block->acc_weights + adj_head, cur_block->acc_weights + adj_tail, conf.p, conf.q);
+                }
+                else if (sampler->use_acc_weight)
+                {
+                    autoregressive_context<BIASEDACCSECONDORDERCTX> ctx(cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
+                                                                        &seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail,
+                                                                        cur_block->acc_weights + adj_head, cur_block->acc_weights + adj_tail, conf.alpha, prev_block->acc_weights + prev_adj_head, prev_block->acc_weights + prev_adj_tail);
                     next_vertex = vertex_sample(ctx, sampler);
-                } else {
-                    node2vec_context<BIASEDSECONDORDERCTX> ctx(cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
-                                                               &seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail,
-                                                               cur_block->weights + adj_head, cur_block->weights + adj_tail, conf.p, conf.q);
+                }
+                else
+                {
+                    autoregressive_context<BIASEDSECONDORDERCTX> ctx(cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
+                                                                     &seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail,
+                                                                     cur_block->weights + adj_head, cur_block->weights + adj_tail, conf.alpha, prev_block->weights + prev_adj_head, prev_block->weights + prev_adj_tail);
                     next_vertex = vertex_sample(ctx, sampler);
                 }
             }
@@ -74,14 +75,16 @@ public:
             cur_vertex = next_vertex;
 
             prev_cache_index = cur_cache_index;
-            if(!(cur_vertex >= cur_block->block->start_vert && cur_vertex < cur_block->block->start_vert + cur_block->block->nverts)) {
+            if (!(cur_vertex >= cur_block->block->start_vert && cur_vertex < cur_block->block->start_vert + cur_block->block->nverts))
+            {
                 cur_blk = walk_manager->global_blocks->get_block(cur_vertex);
                 cur_cache_index = (*(walk_manager->global_blocks))[cur_blk].cache_index;
             }
             hop--;
         }
 
-        if(hop > 0) {
+        if (hop > 0)
+        {
             walker_t<vid_t> next_walker = walker_makeup(prev_vertex, WALKER_ID(walker), WALKER_SOURCE(walker), cur_vertex, hop);
             walk_manager->move_walk(next_walker);
             walk_manager->set_max_hop(next_walker);
@@ -89,24 +92,26 @@ public:
     }
 };
 
-class node2vec_t {
+class autoregressive_t
+{
 private:
-    node2vec_conf_t _conf;
+    autoregressive_conf_t _conf;
 
     void post_query_weights(cache_block *cur_block, vid_t cur_vertex, cache_block *prev_block, vid_t prev_vertex, std::vector<real_t> &adj_weights);
+
 public:
-    node2vec_t(wid_t nsources, hid_t steps, real_t p, real_t q)
+    autoregressive_t(wid_t nsources, hid_t steps, real_t alpha)
     {
         _conf.numsources = nsources;
         _conf.hops = steps;
-        _conf.p = p;
-        _conf.q = q;
+        _conf.alpha = alpha;
     }
 
-    template<typename AppConfig>
-    node2vec_t(AppConfig& conf) { }
+    template <typename AppConfig>
+    autoregressive_t(AppConfig &conf) {}
 
-    node2vec_t(node2vec_conf_t& conf) {
+    autoregressive_t(autoregressive_conf_t &conf)
+    {
         _conf = conf;
     }
 
@@ -118,19 +123,20 @@ public:
     template <typename walk_data_t, WalkType walk_type, typename SampleType>
     void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, SampleType *sampler)
     {
-        update_strategy_t<node2vec_conf_t, vid_t, SecondOrder, SampleType>::update_walk(_conf, walker, cache, walk_manager, sampler);
+        update_strategy_t<autoregressive_conf_t, vid_t, SecondOrder, SampleType>::update_walk(_conf, walker, cache, walk_manager, sampler);
     }
 
-    void epilogue() {
-        
+    void epilogue()
+    {
     }
 
     wid_t get_numsources() { return _conf.numsources; }
     hid_t get_hops() { return _conf.hops; }
 };
 
-template<>
-void node2vec_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOrder> *walk_manager) {
+template <>
+void autoregressive_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOrder> *walk_manager)
+{
 #pragma omp parallel for schedule(static)
     for (wid_t idx = 0; idx < this->_conf.numsources; idx++)
     {

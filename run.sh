@@ -15,4 +15,4 @@ echo "vertices = $VERTICES, steps = $STEPS, length = $LENGTH"
 sudo sync; sudo sh -c '/usr/bin/echo 1 > /proc/sys/vm/drop_caches'
 
 # the random command
-./bin/test/node2vec $DATASET $1 nmblocks $NMBLOCKS sample its walks $STEPS length $LENGTH weighted
+./bin/test/autoregressive $DATASET $1 nmblocks $NMBLOCKS sample its walks $STEPS length $LENGTH weighted

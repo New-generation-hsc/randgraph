@@ -288,7 +288,9 @@ class second_order_opt_alias_sample_t : public sample_t {
 public:
     second_order_opt_alias_sample_t() : sample_t(true, true) { }
 
-    vid_t sample(node2vec_context<BIASEDACCSECONDORDERCTX> &ctx) {
+    template <typename ContextType>
+    vid_t sample(ContextType &ctx)
+    {
         eid_t deg = (size_t)(ctx.adj_end - ctx.adj_start);
         std::vector<real_t> adj_weights;
         std::vector<vid_t> comm_neighbors;
@@ -376,6 +378,59 @@ vid_t vertex_sample(node2vec_context<BIASEDSECONDORDERCTX> &ctx, second_order_op
 }
 
 vid_t vertex_sample(node2vec_context<BIASEDACCSECONDORDERCTX> &ctx, second_order_opt_alias_sample_t *sampler) {
+    eid_t deg = (eid_t)(ctx.adj_end - ctx.adj_start);
+    if(deg > 0) {
+        return sampler->sample(ctx);
+    } else {
+        return rand_r(ctx.local_seed) % ctx.nvertices;
+    }
+}
+
+/* ------------------------------ autogressive sample ----------------------------- */
+template<CtxType ctx_type>
+vid_t vertex_sample(autoregressive_context<ctx_type> &ctx, sample_policy_t *sampler) {
+    eid_t deg = (eid_t)(ctx.adj_end - ctx.adj_start);
+    if(deg > 0) {
+        std::vector<real_t> adj_weights;
+        ctx.query_neigbors_weight(adj_weights);
+        vid_t off = sampler->sample(adj_weights);
+        return ctx.adj_start[off];
+    } else {
+        return rand_r(ctx.local_seed) % ctx.nvertices;
+    }
+}
+
+vid_t vertex_sample(autoregressive_context<SECONDORDERCTX> &ctx, second_order_soopt_sample_t *sampler) {
+    eid_t deg = (eid_t)(ctx.adj_end - ctx.adj_start);
+    if(deg > 0) {
+        return sampler->sample(ctx);
+    } else {
+        return rand_r(ctx.local_seed) % ctx.nvertices;
+    }
+}
+
+vid_t vertex_sample(autoregressive_context<BIASEDACCSECONDORDERCTX> &ctx, second_order_soopt_sample_t *sampler) {
+    eid_t deg = (eid_t)(ctx.adj_end - ctx.adj_start);
+    if(deg > 0) {
+        return sampler->sample(ctx);
+    } else {
+        return rand_r(ctx.local_seed) % ctx.nvertices;
+    }
+}
+
+vid_t vertex_sample(autoregressive_context<SECONDORDERCTX> &ctx, second_order_opt_alias_sample_t *sampler)
+{
+    logstream(LOG_ERROR) << "can't deal with SECONDORDERCTX second-order random walk" << std::endl;
+    return 0;
+}
+
+vid_t vertex_sample(autoregressive_context<BIASEDSECONDORDERCTX> &ctx, second_order_opt_alias_sample_t *sampler)
+{
+    logstream(LOG_ERROR) << "can't deal with BIASEDSECONDORDERCTX second-order random walk" << std::endl;
+    return 0;
+}
+
+vid_t vertex_sample(autoregressive_context<BIASEDACCSECONDORDERCTX> &ctx, second_order_opt_alias_sample_t *sampler) {
     eid_t deg = (eid_t)(ctx.adj_end - ctx.adj_start);
     if(deg > 0) {
         return sampler->sample(ctx);

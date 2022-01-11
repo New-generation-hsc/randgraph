@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 #include <ctime>
+#include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
 #include "api/types.hpp"
@@ -313,4 +314,211 @@ public:
     }
 };
 
+
+/* ------------------------ autoregressive context start --------------------------------- */
+
+template <CtxType ctx_type>
+class autoregressive_context : public walk_context<ctx_type>
+{
+public:
+    autoregressive_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                           vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e) : walk_context<ctx_type>(vertex, num_vertices, start, end, seed)
+    {
+        logstream(LOG_ERROR) << "you should use a specialized node2vec context" << std::endl;
+    }
+};
+
+template <>
+class autoregressive_context<SECONDORDERCTX> : public walk_context<SECONDORDERCTX>
+{
+public:
+    real_t alpha;
+    autoregressive_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                           vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, float param_alpha) : walk_context<SECONDORDERCTX>(vertex, num_vertices, start, end, seed, prev, p_adj_s, p_adj_e)
+    {
+        this->alpha = param_alpha;
+    }
+
+    void query_neigbors_weight(std::vector<real_t> &adj_weights)
+    {
+        size_t deg = static_cast<size_t>(adj_end - adj_start);
+        adj_weights.resize(deg);
+        std::unordered_set<vid_t> prev_neighbors(prev_adj_start, prev_adj_end);
+        for (size_t index = 0; index < deg; ++index)
+        {
+            if (prev_neighbors.find(*(adj_start + index)) != prev_neighbors.end())
+            {
+                adj_weights[index] = (1.0 - alpha);
+            }
+            else
+            {
+                adj_weights[index] = alpha;
+            }
+        }
+    }
+
+    void query_comm_neigbors_weight(std::vector<real_t> &adj_weights, std::vector<vid_t> &comm_neighbors, real_t &total_weight)
+    {
+        size_t deg = static_cast<size_t>(adj_end - adj_start);
+        std::unordered_set<vid_t> prev_neighbors(prev_adj_start, prev_adj_end);
+        real_t comm_weight_sum = 0;
+        for (size_t index = 0; index < deg; ++index)
+        {
+            if (prev_neighbors.find(*(adj_start + index)) != prev_neighbors.end())
+            {
+                comm_weight_sum += 1.0;
+                adj_weights.push_back(comm_weight_sum);
+                comm_neighbors.push_back(*(adj_start + index));
+            }
+        }
+        total_weight = comm_weight_sum + (deg - comm_neighbors.size()) * (1.0 - alpha);
+    }
+
+    real_t query_pivot_weight(const std::vector<real_t> &adj_weights, const std::vector<vid_t> &comm_neighbors, eid_t pivot)
+    {
+        size_t pos = std::upper_bound(comm_neighbors.begin(), comm_neighbors.end(), *(adj_start + pivot)) - comm_neighbors.begin();
+        real_t pivot_weight = 0.0;
+        if (pos > 0)
+        {
+            pivot_weight += adj_weights[pos - 1];
+        }
+        pivot_weight += (pivot - pos) * (1.0 - alpha);
+        return pivot_weight;
+    }
+};
+
+template <>
+class autoregressive_context<BIASEDSECONDORDERCTX> : public walk_context<BIASEDSECONDORDERCTX>
+{
+public:
+    real_t alpha;
+    real_t *prev_weight_start, *prev_weight_end;
+    autoregressive_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                           vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, real_t *wht_start, real_t *wht_end,
+                           real_t param_alpha, real_t *p_wht_s, real_t *p_wht_e) : walk_context<BIASEDSECONDORDERCTX>(vertex, num_vertices, start, end, seed, prev, p_adj_s, p_adj_e, wht_start, wht_end)
+    {
+        this->alpha = param_alpha;
+        this->prev_weight_start = p_wht_s;
+        this->prev_weight_end   = p_wht_e;
+    }
+
+    void query_neigbors_weight(std::vector<real_t> &adj_weights)
+    {
+        size_t deg = static_cast<size_t>(adj_end - adj_start);
+        adj_weights.resize(deg);
+        std::unordered_map<vid_t, size_t> neighbor_index;
+        size_t prev_deg = static_cast<size_t>(prev_adj_end - prev_adj_start);
+        for(size_t index = 0; index < prev_deg; ++index) neighbor_index[*(prev_adj_start + index)] = index;
+
+        for (size_t index = 0; index < deg; ++index)
+        {
+            if (neighbor_index.find(*(adj_start + index)) != neighbor_index.end())
+            {
+                adj_weights[index] = *(weight_start + index) * (1.0 - alpha) + *(prev_weight_start + neighbor_index[*(adj_start + index)]) * alpha;
+            }
+            else
+            {
+                adj_weights[index] = *(weight_start + index) * (1.0 - alpha);
+            }
+        }
+    }
+};
+
+template <>
+class autoregressive_context<BIASEDACCSECONDORDERCTX> : public walk_context<BIASEDACCSECONDORDERCTX>
+{
+public:
+    real_t alpha;
+    real_t *prev_weight_start, *prev_weight_end;
+    autoregressive_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                           vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, real_t *acc_wht_start, real_t *acc_wht_end,
+                           real_t param_alpha, real_t *p_wht_s, real_t *p_wht_e) : walk_context<BIASEDACCSECONDORDERCTX>(vertex, num_vertices, start, end, seed, prev, p_adj_s, p_adj_e, acc_wht_start, acc_wht_end)
+    {
+        this->alpha = param_alpha;
+        this->prev_weight_start = p_wht_s;
+        this->prev_weight_end = p_wht_e;
+    }
+
+    autoregressive_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                           vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, real_t *acc_wht_start, real_t *acc_wht_end,
+                           real_t *pb, vid_t *alias_index, real_t param_alpha, real_t *p_wht_s, real_t *p_wht_e) : walk_context<BIASEDACCSECONDORDERCTX>(vertex, num_vertices, start, end, seed, prev, p_adj_s, p_adj_e, acc_wht_start, acc_wht_end, pb, alias_index)
+    {
+        this->alpha = param_alpha;
+        this->prev_weight_start = p_wht_s;
+        this->prev_weight_end = p_wht_e;
+    }
+
+    void query_neigbors_weight(std::vector<real_t> &adj_weights)
+    {
+        size_t deg = static_cast<size_t>(adj_end - adj_start);
+        adj_weights.resize(deg);
+        std::unordered_map<vid_t, size_t> neighbor_index;
+        size_t prev_deg = static_cast<size_t>(prev_adj_end - prev_adj_start);
+        for(size_t index = 0; index < prev_deg; ++index) neighbor_index[*(prev_adj_start + index)] = index;
+
+        for (size_t index = 0; index < deg; ++index)
+        {
+            if (neighbor_index.find(*(adj_start + index)) != neighbor_index.end())
+            {
+                real_t cur_w = 0.0, prev_w = 0.0;
+                if (index == 0) cur_w = *acc_weight_start;
+                else cur_w = *(acc_weight_start + index) - *(acc_weight_start + index - 1);
+
+                size_t prev_index = neighbor_index[*(adj_start + index)];
+                if (prev_index == 0) prev_w = *prev_weight_start;
+                else {
+                    prev_w = *(prev_weight_start + prev_index) - *(prev_weight_start + prev_index - 1);
+                }
+                adj_weights[index] = (1.0 - alpha) * cur_w + alpha * prev_w;
+            }
+            else
+            {
+                if (index == 0)
+                    adj_weights[index] = (*acc_weight_start) * (1.0 - alpha);
+                else
+                    adj_weights[index] = (*(acc_weight_start + index) - *(acc_weight_start + index - 1)) * (1.0 - alpha);
+            }
+        }
+    }
+
+    void query_comm_neigbors_weight(std::vector<real_t> &adj_weights, std::vector<vid_t> &comm_neighbors, real_t &total_weight)
+    {
+        size_t deg = static_cast<size_t>(adj_end - adj_start);
+        std::unordered_map<vid_t, size_t> neighbor_index;
+        size_t prev_deg = static_cast<size_t>(prev_adj_end - prev_adj_start);
+        for(size_t index = 0; index < prev_deg; ++index) neighbor_index[*(prev_adj_start + index)] = index;
+
+        real_t comm_weight_sum = 0;
+        for (size_t index = 0; index < deg; ++index)
+        {
+            if (neighbor_index.find(*(adj_start + index)) != neighbor_index.end())
+            {
+                real_t prev_w = 0.0;
+                size_t prev_index = neighbor_index[*(adj_start + index)];
+                if (prev_index == 0) prev_w = *prev_weight_start;
+                else {
+                    prev_w = *(prev_weight_start + prev_index) - *(prev_weight_start + prev_index - 1);
+                }
+                comm_weight_sum += alpha * prev_w / (1.0 - alpha);
+                adj_weights.push_back(comm_weight_sum);
+                comm_neighbors.push_back(*(adj_start + index));
+            }
+        }
+        total_weight = comm_weight_sum + (*(acc_weight_start + (deg - 1)));
+    }
+
+    real_t query_pivot_weight(const std::vector<real_t> &adj_weights, const std::vector<vid_t> &comm_neighbors, eid_t pivot)
+    {
+        size_t pos = std::upper_bound(comm_neighbors.begin(), comm_neighbors.end(), *(adj_start + pivot)) - comm_neighbors.begin();
+        real_t pivot_weight = 0.0;
+        if (pos > 0)
+        {
+            pivot_weight += adj_weights[pos - 1];
+        }
+        pivot_weight += *(acc_weight_start + pivot);
+        return pivot_weight;
+    }
+};
+
+/* ------------------------ autoregressive context start --------------------------------- */
 #endif
