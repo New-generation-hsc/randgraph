@@ -40,7 +40,7 @@ int main(int argc, const char *argv[])
 
     graph_block blocks(&conf);
     graph_driver driver;
-    metrics m("node2vec");
+    metrics m("autoregressive");
 
     graph_walk<vid_t, SecondOrder> walk_mangager(conf.base_name, conf.nvertices, conf.nthreads, driver, blocks);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
@@ -70,9 +70,9 @@ int main(int argc, const char *argv[])
     //     sampler = &its_sampler;
 
     // logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
-    
-    second_order_opt_alias_sample_t test_sampler;
-    second_order_opt_alias_sample_t *sampler = &test_sampler;
+
+    second_order_soopt_sample_t test_sampler;
+    second_order_soopt_sample_t *sampler = &test_sampler;
     // scheduler<second_order_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, m);
     scheduler<navie_graphwalker_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, sampler, m);
 

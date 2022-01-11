@@ -207,7 +207,7 @@ public:
         if(pos > 0) {
             pivot_weight += adj_weights[pos - 1];
         }
-        pivot_weight += (pivot - pos) / q;
+        pivot_weight += (pivot + 1 - pos) / q;
         return pivot_weight;
     }
 };
@@ -288,13 +288,13 @@ public:
         real_t comm_weight_sum = 0;
         for(size_t index = 0; index < deg; ++index) {
             if(*(adj_start + index) == prev_vertex) {
-                if(index == 0) comm_weight_sum += (q - 1) * (*acc_weight_start);
-                else comm_weight_sum += (q - q) * (*(acc_weight_start + index) - *(acc_weight_start + index - 1));
+                if(index == 0) comm_weight_sum += (q - 1.0) * (*acc_weight_start);
+                else comm_weight_sum += (q - 1.0) * (*(acc_weight_start + index) - *(acc_weight_start + index - 1));
                 adj_weights.push_back(comm_weight_sum);
                 comm_neighbors.push_back(*(adj_start + index));
             }else if(prev_neighbors.find(*(adj_start + index)) != prev_neighbors.end()) {
-                if(index == 0) comm_weight_sum += (q / p - 1) * (*acc_weight_start);
-                else comm_weight_sum += (q / p - 1) * (*(acc_weight_start + index) - *(acc_weight_start + index - 1));
+                if(index == 0) comm_weight_sum += (q / p - 1.0) * (*acc_weight_start);
+                else comm_weight_sum += (q / p - 1.0) * (*(acc_weight_start + index) - *(acc_weight_start + index - 1));
                 adj_weights.push_back(comm_weight_sum);
                 comm_neighbors.push_back(*(adj_start + index));
             }
@@ -382,7 +382,7 @@ public:
         {
             pivot_weight += adj_weights[pos - 1];
         }
-        pivot_weight += (pivot - pos) * (1.0 - alpha);
+        pivot_weight += (pivot + 1 - pos) * (1.0 - alpha);
         return pivot_weight;
     }
 };

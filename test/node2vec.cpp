@@ -68,15 +68,17 @@ int main(int argc, const char *argv[])
     //     sampler = &reject_sampler;
     // else
     //     sampler = &its_sampler;
-    second_order_opt_alias_sample_t sampler;
+    // second_order_opt_alias_sample_t sampler;
+    second_order_soopt_sample_t test_sampler;
+    second_order_soopt_sample_t *sampler = &test_sampler;
 
-    logstream(LOG_INFO) << "sample policy : " << sampler.sample_name() << std::endl;
+    logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
     // scheduler<second_order_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, m);
-    scheduler<navie_graphwalker_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, &sampler, m);
+    scheduler<navie_graphwalker_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, sampler, m);
 
     engine.prologue(userprogram);
-    engine.run(userprogram, &walk_scheduler, &sampler);
+    engine.run(userprogram, &walk_scheduler, sampler);
     engine.epilogue(userprogram);
 
     metrics_report(m);

@@ -43,6 +43,7 @@ class graph_converter : public base_converter {
 private:
     int fnum;
     bool _weighted;
+    bool _sorted;
     graph_buffer<eid_t> beg_pos;
     graph_buffer<vid_t> csr;
     graph_buffer<vid_t> deg;
@@ -124,7 +125,7 @@ private:
     }
 public:
     graph_converter() = delete;
-    graph_converter(const std::string& path, bool weighted = false) {
+    graph_converter(const std::string& path, bool weighted = false, bool sorted = false) {
         fnum = 0;
         beg_pos.alloc(VERT_SIZE);
         csr.alloc(EDGE_SIZE);
@@ -132,11 +133,12 @@ public:
         curr_vert = max_vert = buf_vstart = buf_estart = rd_edges = csr_pos = 0;
         setup_output(path);
         _weighted = weighted;
+        _sorted = sorted;
         if(_weighted) {
             weights.alloc(EDGE_SIZE);
         }
     }
-    graph_converter(const std::string& folder, const std::string& dataset, bool weighted = false) {
+    graph_converter(const std::string& folder, const std::string& dataset, bool weighted = false, bool sorted = false) {
         fnum = 0;
         beg_pos.alloc(VERT_SIZE);
         csr.alloc(EDGE_SIZE);
@@ -144,11 +146,12 @@ public:
         curr_vert = max_vert = buf_vstart = buf_estart = rd_edges = csr_pos = 0;
         setup_output(folder, dataset);
         _weighted = weighted;
+        _sorted = sorted;
         if(_weighted) {
             weights.alloc(EDGE_SIZE);
         }
     }
-    graph_converter(const std::string& path, size_t vert_size, size_t edge_size, bool weighted = false) {
+    graph_converter(const std::string& path, size_t vert_size, size_t edge_size, bool weighted = false, bool sorted = false) {
         fnum = 0;
         beg_pos.alloc(vert_size);
         csr.alloc(edge_size);
@@ -156,6 +159,7 @@ public:
         curr_vert = max_vert = buf_vstart = buf_estart = rd_edges = csr_pos = 0;
         setup_output(path);
         _weighted = weighted;
+        _sorted = sorted;
         if(_weighted) {
             weights.alloc(EDGE_SIZE);
         }
@@ -221,6 +225,8 @@ public:
     int get_fnum() { return this->fnum + 1; }
     std::string get_output_filename() const { return output_filename; }
     bool is_weighted() const { return _weighted; }
+
+    bool need_sorted() const { return _sorted; }
 };
 
 void convert(std::string filename, graph_converter &converter, size_t blocksize = BLOCK_SIZE) {
@@ -257,6 +263,10 @@ void convert(std::string filename, graph_converter &converter, size_t blocksize 
 
     /* split the data into multiple blocks */
     split_blocks(converter.get_output_filename(), 0, blocksize);
+
+    if(converter.need_sorted()) {
+        sort_vertex_neighbors(converter.get_output_filename(), 0, blocksize, converter.is_weighted());
+    }
     
     /* if the graph is weighted, then preprocess the alias table. */
     if(converter.is_weighted()) {

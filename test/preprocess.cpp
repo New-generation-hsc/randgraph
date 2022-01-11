@@ -8,7 +8,8 @@ int main(int argc, const char* argv[]) {
     logstream(LOG_INFO) << "app : " << argv[0] << ", dataset : " << argv[1] << std::endl;
     std::string input = argv[1];
     bool weighted = get_option_bool("weighted");
-    graph_converter converter(remove_extension(input), weighted);
+    bool sorted   = get_option_bool("sorted");
+    graph_converter converter(remove_extension(input), weighted, sorted);
     convert(input, converter);
     logstream(LOG_INFO) << "  ================= FINISHED ======================  " << std::endl;
     return 0;
