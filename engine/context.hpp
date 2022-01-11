@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <unordered_set>
+#include <algorithm>
 #include "api/types.hpp"
 #include "logger/logger.hpp"
 
@@ -110,6 +111,8 @@ public:
     vid_t prev_vertex;
     vid_t *prev_adj_start, *prev_adj_end;
     real_t *acc_weight_start, *acc_weight_end;
+    real_t *prob;
+    vid_t  *alias;
 
     walk_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
                  vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, real_t *acc_wht_start, real_t *acc_wht_end) : context(vertex, num_vertices, start, end, seed)
@@ -119,6 +122,21 @@ public:
         this->prev_adj_end = p_adj_e;
         this->acc_weight_start = acc_wht_start;
         this->acc_weight_end = acc_wht_end;
+        this->prob = nullptr;
+        this->alias = nullptr;
+    }
+
+    walk_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                 vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, real_t *acc_wht_start, real_t *acc_wht_end,
+                 real_t *pb, vid_t *alias_index) : context(vertex, num_vertices, start, end, seed)
+    {
+        this->prev_vertex = prev;
+        this->prev_adj_start = p_adj_s;
+        this->prev_adj_end = p_adj_e;
+        this->acc_weight_start = acc_wht_start;
+        this->acc_weight_end = acc_wht_end;
+        this->prob = pb;
+        this->alias = alias_index;
     }
 };
 
@@ -161,6 +179,36 @@ public:
             }
         }
     }
+
+    void query_comm_neigbors_weight(std::vector<real_t> &adj_weights, std::vector<vid_t> &comm_neighbors, real_t &total_weight)
+    {
+        size_t deg = static_cast<size_t>(adj_end - adj_start);
+        std::unordered_set<vid_t> prev_neighbors(prev_adj_start, prev_adj_end);
+        real_t comm_weight_sum = 0;
+        for(size_t index = 0; index < deg; ++index) {
+            if(*(adj_start + index) == prev_vertex) {
+                comm_weight_sum += 1.0;
+                adj_weights.push_back(comm_weight_sum);
+                comm_neighbors.push_back(*(adj_start + index));
+            }else if(prev_neighbors.find(*(adj_start + index)) != prev_neighbors.end()) {
+                comm_weight_sum += 1.0 / p;
+                adj_weights.push_back(comm_weight_sum);
+                comm_neighbors.push_back(*(adj_start + index));
+            }
+        }
+        total_weight = comm_weight_sum + (deg - comm_neighbors.size()) / q;
+    }
+
+    real_t query_pivot_weight(const std::vector<real_t> &adj_weights, const std::vector<vid_t> &comm_neighbors, eid_t pivot)
+    {
+        size_t pos = std::upper_bound(comm_neighbors.begin(), comm_neighbors.end(), *(adj_start + pivot)) - comm_neighbors.begin();
+        real_t pivot_weight = 0.0;
+        if(pos > 0) {
+            pivot_weight += adj_weights[pos - 1];
+        }
+        pivot_weight += (pivot - pos) / q;
+        return pivot_weight;
+    }
 };
 
 template <>
@@ -198,7 +246,16 @@ class node2vec_context<BIASEDACCSECONDORDERCTX> : public walk_context<BIASEDACCS
 public:
     float p, q;
     node2vec_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
-                     vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, real_t *acc_wht_start, real_t *acc_wht_end, float param_p, float param_q) : walk_context<BIASEDACCSECONDORDERCTX>(vertex, num_vertices, start, end, seed, prev, p_adj_s, p_adj_e, acc_wht_start, acc_wht_end)
+                     vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, real_t *acc_wht_start, real_t *acc_wht_end,
+                     float param_p, float param_q) : walk_context<BIASEDACCSECONDORDERCTX>(vertex, num_vertices, start, end, seed, prev, p_adj_s, p_adj_e, acc_wht_start, acc_wht_end)
+    {
+        this->p = param_p;
+        this->q = param_q;
+    }
+
+    node2vec_context(vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
+                     vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, real_t *acc_wht_start, real_t *acc_wht_end,
+                     real_t *pb, vid_t *alias_index, float param_p, float param_q) : walk_context<BIASEDACCSECONDORDERCTX>(vertex, num_vertices, start, end, seed, prev, p_adj_s, p_adj_e, acc_wht_start, acc_wht_end, pb, alias_index)
     {
         this->p = param_p;
         this->q = param_q;
@@ -221,6 +278,38 @@ public:
                 else adj_weights[index] = (*(acc_weight_start + index) - *(acc_weight_start + index - 1)) / q;
             }
         }
+    }
+
+    void query_comm_neigbors_weight(std::vector<real_t> &adj_weights, std::vector<vid_t> &comm_neighbors, real_t &total_weight)
+    {
+        size_t deg = static_cast<size_t>(adj_end - adj_start);
+        std::unordered_set<vid_t> prev_neighbors(prev_adj_start, prev_adj_end);
+        real_t comm_weight_sum = 0;
+        for(size_t index = 0; index < deg; ++index) {
+            if(*(adj_start + index) == prev_vertex) {
+                if(index == 0) comm_weight_sum += (q - 1) * (*acc_weight_start);
+                else comm_weight_sum += (q - q) * (*(acc_weight_start + index) - *(acc_weight_start + index - 1));
+                adj_weights.push_back(comm_weight_sum);
+                comm_neighbors.push_back(*(adj_start + index));
+            }else if(prev_neighbors.find(*(adj_start + index)) != prev_neighbors.end()) {
+                if(index == 0) comm_weight_sum += (q / p - 1) * (*acc_weight_start);
+                else comm_weight_sum += (q / p - 1) * (*(acc_weight_start + index) - *(acc_weight_start + index - 1));
+                adj_weights.push_back(comm_weight_sum);
+                comm_neighbors.push_back(*(adj_start + index));
+            }
+        }
+        total_weight = comm_weight_sum + (*(acc_weight_start + (deg - 1)));
+    }
+
+    real_t query_pivot_weight(const std::vector<real_t> &adj_weights, const std::vector<vid_t> &comm_neighbors, eid_t pivot)
+    {
+        size_t pos = std::upper_bound(comm_neighbors.begin(), comm_neighbors.end(), *(adj_start + pivot)) - comm_neighbors.begin();
+        real_t pivot_weight = 0.0;
+        if(pos > 0) {
+            pivot_weight += adj_weights[pos - 1];
+        }
+        pivot_weight += *(acc_weight_start + pivot);
+        return pivot_weight;
     }
 };
 

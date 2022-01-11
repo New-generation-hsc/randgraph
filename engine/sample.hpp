@@ -34,8 +34,8 @@ size_t its_sample_impl(const iterator_type &first, const iterator_type &last)
     real_t diff = prefix_sum[n];
     real_t random = (real_t)rand() / (real_t)RAND_MAX;
     real_t rand_val = diff * random;
-    size_t pos = std::lower_bound(prefix_sum.begin(), prefix_sum.end(), rand_val) - prefix_sum.begin();
-    assert(pos > 0 && pos <= n);
+    size_t pos = std::upper_bound(prefix_sum.begin(), prefix_sum.end(), rand_val) - prefix_sum.begin();
+    assert(pos > 0);
 #ifdef TEST_SAMPLE
     std::cout << "prefix:";
     for (const auto &s : prefix_sum)
@@ -250,6 +250,68 @@ public:
     }
 };
 
+/**
+ * @brief the second-order soop-t sample follows the idea of SOOP paper
+ * 
+ */
+class second_order_soopt_sample_t : public sample_t {
+public:
+    second_order_soopt_sample_t() : sample_t(true) { }
+
+    template <typename ContextType>
+    vid_t sample(ContextType &ctx)
+    {
+        eid_t deg = (size_t)(ctx.adj_end - ctx.adj_start);
+        std::vector<real_t> adj_weights;
+        std::vector<vid_t> comm_neighbors;
+        real_t total_weights = 0.0;
+        ctx.query_comm_neigbors_weight(adj_weights, comm_neighbors, total_weights);
+        eid_t low = 0, high = deg - 1;
+        real_t randval = rand_r(ctx.local_seed) / RAND_MAX * total_weights;
+        while (low < high) {
+            eid_t mid = low + (high - low) / 2;
+            real_t pivot_weight = ctx.query_pivot_weight(adj_weights, comm_neighbors, mid);
+            if(pivot_weight > randval) high = mid - 1;
+            else low = mid;
+        }
+        return *(ctx.adj_start + low);
+    }
+
+    std::string sample_name() { return "second_order_soopt_sample_t"; }
+};
+
+/**
+ * @brief the secon-order optimized alias sample method
+ * 
+ */
+class second_order_opt_alias_sample_t : public sample_t {
+public:
+    second_order_opt_alias_sample_t() : sample_t(true, true) { }
+
+    vid_t sample(node2vec_context<BIASEDACCSECONDORDERCTX> &ctx) {
+        eid_t deg = (size_t)(ctx.adj_end - ctx.adj_start);
+        std::vector<real_t> adj_weights;
+        std::vector<vid_t> comm_neighbors;
+        real_t total_weights = 0.0;
+        ctx.query_comm_neigbors_weight(adj_weights, comm_neighbors, total_weights);
+        real_t old_weights = *(ctx.acc_weight_start + (deg - 1));
+        real_t randval = rand_r(ctx.local_seed) / RAND_MAX * total_weights;
+        size_t rand_pos = rand_r(ctx.local_seed) % deg;
+        vid_t target_vertex = 0;
+        if(randval < ctx.prob[rand_pos]) target_vertex = *(ctx.adj_start + rand_pos);
+        else if(randval < old_weights) target_vertex = *(ctx.adj_start + ctx.alias[rand_pos]);
+        else {
+            assert(adj_weights.size() > 0);
+            randval = rand_r(ctx.local_seed) / RAND_MAX * adj_weights.back();
+            size_t pos = std::upper_bound(adj_weights.begin(), adj_weights.end(), randval) - adj_weights.begin();
+            target_vertex = comm_neighbors[pos];
+        }
+        return target_vertex;
+    }
+
+    std::string sample_name() { return "second_order_opt_alias_sample_t"; }
+};
+
 vid_t vertex_sample(const walk_context<UNBAISEDCONTEXT> &ctx, sample_policy_t *sampler) {
     eid_t deg = (eid_t)(ctx.adj_end - ctx.adj_start);
     if(deg > 0 && (float)rand_r(ctx.local_seed) / RAND_MAX > ctx.teleport) {
@@ -278,6 +340,45 @@ vid_t vertex_sample(node2vec_context<ctx_type> &ctx, sample_policy_t *sampler) {
         ctx.query_neigbors_weight(adj_weights);
         vid_t off = sampler->sample(adj_weights);
         return ctx.adj_start[off];
+    } else {
+        return rand_r(ctx.local_seed) % ctx.nvertices;
+    }
+}
+
+vid_t vertex_sample(node2vec_context<SECONDORDERCTX> &ctx, second_order_soopt_sample_t *sampler) {
+    eid_t deg = (eid_t)(ctx.adj_end - ctx.adj_start);
+    if(deg > 0) {
+        return sampler->sample(ctx);
+    } else {
+        return rand_r(ctx.local_seed) % ctx.nvertices;
+    }
+}
+
+vid_t vertex_sample(node2vec_context<BIASEDACCSECONDORDERCTX> &ctx, second_order_soopt_sample_t *sampler) {
+    eid_t deg = (eid_t)(ctx.adj_end - ctx.adj_start);
+    if(deg > 0) {
+        return sampler->sample(ctx);
+    } else {
+        return rand_r(ctx.local_seed) % ctx.nvertices;
+    }
+}
+
+vid_t vertex_sample(node2vec_context<SECONDORDERCTX> &ctx, second_order_opt_alias_sample_t *sampler)
+{
+    logstream(LOG_ERROR) << "can't deal with SECONDORDERCTX second-order random walk" << std::endl;
+    return 0;
+}
+
+vid_t vertex_sample(node2vec_context<BIASEDSECONDORDERCTX> &ctx, second_order_opt_alias_sample_t *sampler)
+{
+    logstream(LOG_ERROR) << "can't deal with BIASEDSECONDORDERCTX second-order random walk" << std::endl;
+    return 0;
+}
+
+vid_t vertex_sample(node2vec_context<BIASEDACCSECONDORDERCTX> &ctx, second_order_opt_alias_sample_t *sampler) {
+    eid_t deg = (eid_t)(ctx.adj_end - ctx.adj_start);
+    if(deg > 0) {
+        return sampler->sample(ctx);
     } else {
         return rand_r(ctx.local_seed) % ctx.nvertices;
     }

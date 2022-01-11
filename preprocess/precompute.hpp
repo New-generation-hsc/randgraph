@@ -51,20 +51,21 @@ struct pre_alias_table {
 void construct_alias_table(const pre_block_t& block, pre_alias_table& table) {
     omp_set_num_threads(omp_get_max_threads());
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
     for (vid_t vertex = 0; vertex < block.nverts; ++vertex)
     {
-        vid_t deg = block.beg_pos[vertex + 1] - block.beg_pos[vertex];
-        real_t sum = std::accumulate(block.weights + block.beg_pos[vertex], block.weights + block.beg_pos[vertex+1], 0.0);
+        eid_t adj_head = block.beg_pos[vertex] - block.start_edge, adj_tail = block.beg_pos[vertex + 1] - block.start_edge;
+        eid_t deg = adj_tail - adj_head;
+        real_t sum = std::accumulate(block.weights + adj_head, block.weights + adj_tail, 0.0);
         std::queue<vid_t> small, large;
-        for(eid_t edge = block.beg_pos[vertex]; edge < block.beg_pos[vertex+1]; ++edge) {
-            vid_t off = static_cast<vid_t>(edge - block.beg_pos[vertex]);
-            table.prob[edge] = block.weights[edge] * deg;
-            if (table.prob[edge] < sum) small.push(off);
-            else large.push(off);
+        for(eid_t off = adj_head; off < adj_tail; ++off) {
+            table.prob[off] = block.weights[off] * deg;
+            if (table.prob[off] < sum) small.push(off - adj_head);
+            else large.push(off - adj_head);
         }
-        real_t *adj_prob  = table.prob + block.beg_pos[vertex];
-        vid_t  *adj_alias = table.alias + block.beg_pos[vertex];
+        
+        real_t *adj_prob  = table.prob + adj_head;
+        vid_t  *adj_alias = table.alias + adj_head;
         while(!small.empty() && !large.empty()) {
             vid_t s = small.front(), l = large.front();
             small.pop(); large.pop();
@@ -94,12 +95,13 @@ void construct_alias_table(const pre_block_t& block, pre_alias_table& table) {
 void construct_accumulate(const pre_block_t& block, real_t* acw) {
     omp_set_num_threads(omp_get_max_threads());
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
     for(vid_t vertex = 0; vertex < block.nverts; ++vertex) {
         real_t s = 0.0;
-        for(eid_t edge = block.beg_pos[vertex]; edge < block.beg_pos[vertex+1]; ++edge) {
-            s += block.weights[edge];
-            acw[edge] = s;
+        eid_t adj_head = block.beg_pos[vertex] - block.start_edge, adj_tail = block.beg_pos[vertex + 1] - block.start_edge;
+        for(eid_t off = adj_head; off < adj_tail; ++off) {
+            s += block.weights[off];
+            acw[off] = s;
         }
     }
 }
@@ -112,7 +114,8 @@ void construct_accumulate(const pre_block_t& block, real_t* acw) {
 void second_order_precompute(const std::string& filename, int fnum, size_t blocksize) {
     std::string vert_block_name = get_vert_blocks_name(filename, blocksize);
     std::string edge_block_name = get_edge_blocks_name(filename, blocksize);
-    std::string degree_name = get_degree_name(filename, fnum);
+    std::string weight_name = get_weights_name(filename, fnum);
+    std::string beg_pos_name = get_beg_pos_name(filename, fnum);
     std::string csr_name = get_csr_name(filename, fnum);
     std::string prob_name = get_prob_name(filename, fnum);
     std::string alias_name = get_alias_name(filename, fnum);
@@ -121,8 +124,9 @@ void second_order_precompute(const std::string& filename, int fnum, size_t block
     std::vector<vid_t> vblocks = load_graph_blocks<vid_t>(vert_block_name);
     std::vector<eid_t> eblocks = load_graph_blocks<eid_t>(edge_block_name);
 
-    int vertdesc = open(degree_name.c_str(), O_RDONLY);
+    int vertdesc = open(beg_pos_name.c_str(), O_RDONLY);
     int edgedesc = open(csr_name.c_str(), O_RDONLY);
+    int whtdesc  = open(weight_name.c_str(), O_RDONLY);
     assert(vertdesc > 0 && edgedesc > 0);
 
     bid_t nblocks = vblocks.size() - 1;
@@ -143,14 +147,21 @@ void second_order_precompute(const std::string& filename, int fnum, size_t block
         table.prob    = (real_t*)realloc(table.prob, block.nedges * sizeof(real_t));
         table.alias   = (vid_t*)realloc(table.alias, block.nedges * sizeof(vid_t));
         acw           = (real_t*)realloc(acw, block.nedges * sizeof(real_t));
-        
+
+        pread(vertdesc, block.beg_pos, (block.nverts + 1) * sizeof(eid_t), block.start_vert * sizeof(eid_t));
+        pread(edgedesc, block.csr, block.nedges * sizeof(vid_t), block.start_edge * sizeof(vid_t));
+        pread(whtdesc, block.weights, block.nedges * sizeof(real_t), block.start_edge * sizeof(real_t));
+
+        logstream(LOG_INFO) << "start computing the alias table and accumulating arry for block = " << blk << std::endl;
+
         construct_alias_table(block, table);
         appendfile(prob_name, table.prob, block.nedges);
         appendfile(alias_name, table.alias, block.nedges);
+        logstream(LOG_INFO) << "finish computing the alias table for block = " << blk << std::endl;
 
         construct_accumulate(block, acw);
         appendfile(acc_name, acw, block.nedges);
-        logstream(LOG_INFO) << "finish computing the alias table and accumulating array for block = " << blk << std::endl;
+        logstream(LOG_INFO) << "finish computing the accumulating array for block = " << blk << std::endl;
     }
 
     if(acw) free(acw);
