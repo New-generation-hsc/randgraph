@@ -279,6 +279,24 @@ public:
         else
             return max_walks_block();
     }
+
+    wid_t block_active_walks(bid_t blk) { return 0; }
 };
+
+template<>
+wid_t graph_walk<empty_data_t, FirstOrder>::block_active_walks(bid_t blk) {
+    return this->nblockwalks(blk);
+}
+
+template<>
+wid_t graph_walk<vid_t, SecondOrder>::block_active_walks(bid_t blk) {
+    wid_t walks_cnt = 0;
+    for(bid_t p = 0; p < nblocks; p++) {
+        walks_cnt += this->nblockwalks(p * nblocks + blk);
+        walks_cnt += this->nblockwalks(blk * nblocks + p);
+    }
+    walks_cnt -= this->nblockwalks(blk * nblocks + blk);
+    return walks_cnt;
+}
 
 #endif

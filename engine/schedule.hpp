@@ -467,11 +467,16 @@ private:
     bid_t swap_block(graph_cache &cache, graph_walk<walk_data_t, walk_type>& walk_manager) {
         bid_t blk = 0;
         int life = -1;
+        wid_t active_walks_cnt = 0xffffffff;
         for(bid_t p = 0; p < cache.ncblock; ++p) {
             if(cache.cache_blocks[p].block == NULL) {
                 blk = p; break;
             }
-            if(cache.cache_blocks[p].life > life) {
+            if(walk_manager->block_active_walks(cache.cache_blocks[p].block->blk) < active_walks_cnt) {
+                blk = p;
+                life = cache.cache_blocks[p].life;
+                active_walks_cnt = walk_manager->block_active_walks(cache.cache_blocks[p].block->blk);
+            } else if(walk_manager->block_active_walks(cache.cache_blocks[p].block->blk) == active_walks_cnt && cache.cache_blocks[p].life > life) {
                 blk = p;
                 life = cache.cache_blocks[p].life;
             }
