@@ -25,15 +25,15 @@ public:
         do {
             sample = dist(gen);
         } while(sample < min_val || sample > max_val);
-        return sample; 
+        return sample;
     }
 };
 
 char* getOption(char** begin, char** end, const std::string& option) {
-		char ** itr = std::find(begin, end, option);
-		if (itr != end && ++itr != end) return *itr;
-		return 0;
-	}
+	char ** itr = std::find(begin, end, option);
+	if (itr != end && ++itr != end) return *itr;
+	return 0;
+}
 
 bool chkOption(char** begin, char** end, const std::string& option) {
     return std::find(begin, end, option) != end;
@@ -53,6 +53,13 @@ T getValue(char** begin, char** end, const std::string& option, T d) {
     return value;
 }
 
+template<>
+bool getValue<bool>(char** begin, char** end, const std::string& option, bool d) {
+    bool value = d;
+    value = chkOption(begin, end, option);
+    return value;
+}
+
 typedef std::function<void(const uint64_t u, const uint64_t v)> output_function;
 typedef std::function<void(const uint64_t u, const uint64_t v, const float w)> output_weighted_function;
 
@@ -63,8 +70,8 @@ uint64_t er_gen(int scale, int degree, int seed, output_function o)
 
     uint64_t e, r, u, v;
     uint8_t bits_per_rand = 64 / scale, nbits = 0;
-    uint64_t mask = (1 << scale) - 1;
-    for (e = 0; e < (1 << scale) * degree; e++)
+    uint64_t mask = (uint64_t)(1 << scale) - 1;
+    for (e = 0; e < (uint64_t)(1 << scale) * degree; e++)
     {
         if (nbits == 0)
         {
@@ -98,9 +105,9 @@ uint64_t er_gen_weighted(int scale, int degree, int seed, output_weighted_functi
 
     uint64_t e, r, u, v;
     uint8_t bits_per_rand = 64 / scale, nbits = 0;
-    uint64_t mask = (1 << scale) - 1;
+    uint64_t mask = (uint64_t)(1 << scale) - 1;
     float w;
-    for (e = 0; e < (1 << scale) * degree; e++)
+    for (e = 0; e < (uint64_t)(1 << scale) * degree; e++)
     {
         if (nbits == 0)
         {
@@ -133,9 +140,9 @@ uint64_t er_gen_normal_weighted(int scale, int degree, int seed, output_weighted
 
     uint64_t e, r, u, v;
     uint8_t bits_per_rand = 64 / scale, nbits = 0;
-    uint64_t mask = (1 << scale) - 1;
+    uint64_t mask = (uint64_t)(1 << scale) - 1;
     float w;
-    for (e = 0; e < (1 << scale) * degree; e++)
+    for (e = 0; e < (uint64_t)(1 << scale) * degree; e++)
     {
         if (nbits == 0)
         {
@@ -180,11 +187,11 @@ int main(int argc, char *argv[])
     int scale = getValue(argv, argv + argc, "-s", 8);
     int degree = getValue(argv, argv + argc, "-d", 8);
     int seed = getValue(argv, argv + argc, "-r", time(NULL));
-    bool weighted = getValue(argv, argv + argc, "-w", false);
+    bool weighted = getValue<bool>(argv, argv + argc, "-w", false);
     char *ofn = getOption(argv, argv + argc, "-o");
 
     ofstream ofile;
-    if(*ofn) ofile.open(ofn, ios::binary);
+    if(ofn) ofile.open(ofn, ios::binary);
 
     if(!weighted) {
         output_function func;
@@ -207,7 +214,7 @@ int main(int argc, char *argv[])
             cout << u << " " << v << " " << w << endl;
         };
 
-        bool normal = getValue(argv, argv + argc, "-n", false);
+        bool normal = getValue<bool>(argv, argv + argc, "-n", false);
         if(normal) er_gen_normal_weighted(scale, degree, seed, func);
         else er_gen_weighted(scale, degree, seed, func);
     }
