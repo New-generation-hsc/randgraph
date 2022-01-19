@@ -1,6 +1,6 @@
 # the following files do not track
 
 .vscode/*
-bin/*
+bin/test/*
 randgraph_metrics.txt
 *.log
