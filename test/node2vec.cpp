@@ -12,7 +12,7 @@
 #include "apps/userprogram.hpp"
 #include "metrics/metrics.hpp"
 #include "metrics/reporter.hpp"
-#include "apps/node2vec.hpp"
+#include "apps/secondorder.hpp"
 
 int main(int argc, const char *argv[])
 {
@@ -46,36 +46,41 @@ int main(int argc, const char *argv[])
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
     wid_t walks = (wid_t)get_option_int("walks", 100000);
     hid_t steps = (hid_t)get_option_int("length", 25);
+    real_t p = (real_t)get_option_float("p", 0.5);
+    real_t q = (real_t)get_option_float("q", 2.0);
     graph_cache cache(min_value(nmblocks, blocks.nblocks), conf.blocksize);
 
-    node2vec_conf_t app_conf = { walks, steps, 0.5, 2};
-    userprogram_t<node2vec_t, node2vec_conf_t> userprogram(app_conf);
+    second_order_param_t app_param = {(real_t)0.0, (real_t)1.0 / p, (real_t)1.0, (real_t)1.0 / q };
+    second_order_conf_t app_conf = { walks, steps, app_param };
+    userprogram_t<second_order_app_t, second_order_conf_t> userprogram(app_conf);
     graph_engine<vid_t, SecondOrder> engine(cache, walk_mangager, driver, conf, m);
 
-    // naive_sample_t naive_sampler;
-    // its_sample_t its_sampler;
-    // alias_sample_t alias_sampler;
-    // reject_sample_t reject_sampler;
+    naive_sample_t naive_sampler;
+    its_sample_t its_sampler;
+    alias_sample_t alias_sampler;
+    reject_sample_t reject_sampler;
+    second_order_soopt_sample_t soopt_sampler;
+    second_order_opt_alias_sample_t opt_alias_sampler;
 
-    // // scheduler *scheduler = nullptr;
-    // sample_policy_t *sampler = nullptr;
-    // std::string type = get_option_string("sample", "its");
-    // if (type == "its")
-    //     sampler = &its_sampler;
-    // else if (type == "alias")
-    //     sampler = &alias_sampler;
-    // else if (type == "reject")
-    //     sampler = &reject_sampler;
-    // else
-    //     sampler = &its_sampler;
-    // second_order_opt_alias_sample_t sampler;
-    second_order_soopt_sample_t test_sampler;
-    second_order_soopt_sample_t *sampler = &test_sampler;
+    // scheduler *scheduler = nullptr;
+    sample_policy_t *sampler = nullptr;
+    std::string type = get_option_string("sample", "its");
+    if (type == "its")
+        sampler = &its_sampler;
+    else if (type == "alias")
+        sampler = &alias_sampler;
+    else if (type == "reject")
+        sampler = &reject_sampler;
+    else if(type == "soopt")
+        sampler = &soopt_sampler;
+    else if(type == "opt_alias")
+        sampler = &opt_alias_sampler;
+    else
+        sampler = &its_sampler;
 
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
-    // scheduler<second_order_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, m);
-    scheduler<navie_graphwalker_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, sampler, m);
+    scheduler<second_order_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, sampler, m);
 
     engine.prologue(userprogram);
     engine.run(userprogram, &walk_scheduler, sampler);

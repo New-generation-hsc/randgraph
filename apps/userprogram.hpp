@@ -14,19 +14,10 @@ public:
     {
         AppType::prologue(walk_manager);
     }
-    template <typename walk_data_t, WalkType walk_type, typename SampleType>
-    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, SampleType *sampler)
+    template <typename walk_data_t, WalkType walk_type>
+    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler)
     {
         AppType::update_walk(walker, cache, walk_manager, sampler);
-    }
-};
-
-template<typename AppConf, typename walk_data_t, WalkType walk_type, typename SampleType>
-class update_strategy_t {
-public:
-    static void update_walk(const AppConf & conf, const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, SampleType *sampler) 
-    {
-        logstream(LOG_ERROR) << "you are using a generic update strategy." << std::endl;
     }
 };
 

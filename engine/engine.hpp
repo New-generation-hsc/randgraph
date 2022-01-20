@@ -39,8 +39,8 @@ public:
         userprogram.prologue(walk_manager);
     }
 
-    template <typename BaseType, typename Config, typename AppType, typename AppConfig, typename SampleType>
-    void run(userprogram_t<AppType, AppConfig> &userprogram, scheduler<BaseType, Config> *block_scheduler, SampleType *sampler)
+    template <typename BaseType, typename Config, typename AppType, typename AppConfig>
+    void run(userprogram_t<AppType, AppConfig> &userprogram, scheduler<BaseType, Config> *block_scheduler, sample_policy_t *sampler)
     {
         logstream(LOG_DEBUG) << "graph blocks : " << walk_manager->global_blocks->nblocks << ", memory blocks : " << cache->ncblock << std::endl;
         logstream(LOG_INFO) << "Random walks start executing, please wait for a minute." << std::endl;
@@ -80,8 +80,8 @@ public:
         logstream(LOG_INFO) << "  ================= FINISHED ======================  " << std::endl;
     }
 
-    template <typename AppType, typename AppConfig, typename SampleType>
-    void exec_block_walk(userprogram_t<AppType, AppConfig> &userprogram, wid_t nwalks, SampleType *sampler)
+    template <typename AppType, typename AppConfig>
+    void exec_block_walk(userprogram_t<AppType, AppConfig> &userprogram, wid_t nwalks, sample_policy_t *sampler)
     {
         if(nwalks < 100) omp_set_num_threads(1);
         else omp_set_num_threads(conf->nthreads);

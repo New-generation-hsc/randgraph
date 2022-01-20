@@ -472,11 +472,11 @@ private:
             if(cache.cache_blocks[p].block == NULL) {
                 blk = p; break;
             }
-            if(walk_manager->block_active_walks(cache.cache_blocks[p].block->blk) < active_walks_cnt) {
+            if(walk_manager.block_active_walks(cache.cache_blocks[p].block->blk) < active_walks_cnt) {
                 blk = p;
                 life = cache.cache_blocks[p].life;
-                active_walks_cnt = walk_manager->block_active_walks(cache.cache_blocks[p].block->blk);
-            } else if(walk_manager->block_active_walks(cache.cache_blocks[p].block->blk) == active_walks_cnt && cache.cache_blocks[p].life > life) {
+                active_walks_cnt = walk_manager.block_active_walks(cache.cache_blocks[p].block->blk);
+            } else if(walk_manager.block_active_walks(cache.cache_blocks[p].block->blk) == active_walks_cnt && cache.cache_blocks[p].life > life) {
                 blk = p;
                 life = cache.cache_blocks[p].life;
             }

@@ -82,4 +82,8 @@ inline vid_t get_vertex_from_walk(const walk_data_t& data) {
     return 0;
 }
 
+struct second_order_param_t {
+    real_t alpha, beta, gamma, delta;
+};
+
 #endif
