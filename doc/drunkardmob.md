@@ -27,5 +27,5 @@ mvn assembly:assembly -DdescriptorId=jar-with-dependencies
 5. run PersonalizedPageRank application
 
 ```
-java -Xmx4096m -cp target/graphchi-java-0.2.2-jar-with-dependencies.jar edu.cmu.graphchi.apps.randomwalks.PersonalizedPageRank  --graph=/home/hsc/dataset/livejournal/soc-LiveJournal1.txt --nshards=4 --niters=5 --nsources=10000 --firstsource=0 --walkspersource=4000
+java -Xmx4096m -cp target/graphchi-java-0.2.2-jar-with-dependencies.jar edu.cmu.graphchi.apps.randomwalks.PersonalizedPageRank  --graph=/home/hsc/dataset/livejournal/soc-LiveJournal1.txt --nshards=16 --niters=4 --nsources=1 --firstsource=0 --walkspersource=1000000
 ```
