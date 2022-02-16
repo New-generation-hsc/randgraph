@@ -64,7 +64,7 @@ void construct_alias_table(const pre_block_t& block, pre_alias_table& table) {
             if (table.prob[off] < sum) small.push(off - adj_head);
             else large.push(off - adj_head);
         }
-        
+
         real_t *adj_prob  = table.prob + adj_head;
         vid_t  *adj_alias = table.alias + adj_head;
         while(!small.empty() && !large.empty()) {
@@ -72,7 +72,7 @@ void construct_alias_table(const pre_block_t& block, pre_alias_table& table) {
             small.pop(); large.pop();
             adj_alias[s] = l;
             adj_prob[l] -= (sum - adj_prob[s]);
-            
+
             if(adj_prob[l] < sum) small.push(l);
             else large.push(l);
         }
@@ -213,7 +213,7 @@ void sort_vertex_neighbors(const std::string &filename, int fnum, size_t blocksi
     logstream(LOG_INFO) << "load vblocks and eblocks successfully, block count : " << nblocks << std::endl;
     pre_block_t block;
     logstream(LOG_INFO) << "start to sort the vertex neighbors, nblocks = " << nblocks << std::endl;
-    
+
     vid_t *new_csr = nullptr;
     real_t *new_weights = nullptr;
     for (bid_t blk = 0; blk < nblocks; blk++)
@@ -252,4 +252,86 @@ void sort_vertex_neighbors(const std::string &filename, int fnum, size_t blocksi
     if(new_weights) free(new_weights);
 }
 
+void max_degree(const std::string& filename, int fnum, size_t blocksize) {
+    std::string vert_block_name = get_vert_blocks_name(filename, blocksize);
+    std::string beg_pos_name = get_beg_pos_name(filename, fnum);
+    std::vector<vid_t> vblocks = load_graph_blocks<vid_t>(vert_block_name);
+    int vertdesc = open(beg_pos_name.c_str(), O_RDONLY);
+
+    bid_t nblocks = vblocks.size() - 1;
+    logstream(LOG_INFO) << "load vblocks and eblocks successfully, block count : " << nblocks << std::endl;
+    pre_block_t block;
+    eid_t max_deg = 0;
+    vid_t hub_vertex;
+    for(bid_t blk = 0; blk < nblocks; blk++) {
+        block.nverts = vblocks[blk + 1] - vblocks[blk];
+        block.start_vert = vblocks[blk];
+        block.beg_pos = (eid_t*)realloc(block.beg_pos, (block.nverts + 1) * sizeof(eid_t));
+        pread(vertdesc, block.beg_pos, (block.nverts + 1) * sizeof(eid_t), block.start_vert * sizeof(eid_t));
+        for(vid_t vertex = 0; vertex < block.nverts; vertex++) {
+            eid_t deg = block.beg_pos[vertex+1] - block.beg_pos[vertex];
+            if(deg > max_deg) {
+                max_deg = deg;
+                hub_vertex = block.start_vert + vertex;
+            }
+        }
+
+        logstream(LOG_INFO) << "finish computing the max degree array for block = " << blk << std::endl;
+    }
+
+    close(vertdesc);
+    std::cout << "max degree vertex = " << hub_vertex << ", degree = " << max_deg << std::endl;
+}
+
+
+void max_link_block(const std::string& filename, int fnum, size_t blocksize) {
+    std::string vert_block_name = get_vert_blocks_name(filename, blocksize);
+    std::string edge_block_name = get_edge_blocks_name(filename, blocksize);
+    std::string beg_pos_name = get_beg_pos_name(filename, fnum);
+    std::string csr_name = get_csr_name(filename, fnum);
+
+    std::vector<vid_t> vblocks = load_graph_blocks<vid_t>(vert_block_name);
+    std::vector<eid_t> eblocks = load_graph_blocks<eid_t>(edge_block_name);
+
+    int vertdesc = open(beg_pos_name.c_str(), O_RDONLY);
+    int edgedesc = open(csr_name.c_str(), O_RDONLY);
+    assert(vertdesc > 0 && edgedesc > 0);
+
+    bid_t nblocks = vblocks.size() - 1;
+    logstream(LOG_INFO) << "load vblocks and eblocks successfully, block count : " << nblocks << std::endl;
+    pre_block_t block;
+    logstream(LOG_INFO) << "start to compute the alias table and accumulate array, nblocks = " << nblocks << std::endl;
+    int link_block = 0;
+    vid_t hub_vertex = 0;
+    for(bid_t blk = 0; blk < nblocks; blk++) {
+        block.nverts = vblocks[blk + 1] - vblocks[blk];
+        block.nedges = eblocks[blk + 1] - eblocks[blk];
+        block.start_vert = vblocks[blk];
+        block.start_edge = eblocks[blk];
+
+        block.beg_pos = (eid_t*)realloc(block.beg_pos, (block.nverts + 1) * sizeof(eid_t));
+        block.csr     = (vid_t*)realloc(block.csr, block.nedges * sizeof(vid_t));
+
+        pread(vertdesc, block.beg_pos, (block.nverts + 1) * sizeof(eid_t), block.start_vert * sizeof(eid_t));
+        pread(edgedesc, block.csr, block.nedges * sizeof(vid_t), block.start_edge * sizeof(vid_t));
+
+        for(vid_t vertex = 0; vertex < block.nverts; vertex++) {
+            int link = 0;
+            eid_t vertex_deg = block.beg_pos[vertex+1] - block.beg_pos[vertex];
+            for(eid_t off = 0; off < vertex_deg; off++) {
+                if(block.csr[off] < block.start_vert || block.csr[off] >= block.start_vert + block.nverts) link++;
+            }
+            if(link > link_block) {
+                link_block = link;
+                hub_vertex = block.start_vert + vertex;
+            }
+        }
+
+        logstream(LOG_INFO) << "finish computing the accumulating array for block = " << blk << std::endl;
+    }
+
+    std::cout << "hub vertex = " << hub_vertex << ", link block = " << link_block << std::endl;
+    close(vertdesc);
+    close(edgedesc);
+}
 #endif

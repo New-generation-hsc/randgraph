@@ -250,6 +250,94 @@ graph_scheduler<graph_config>::graph_scheduler(graph_config &conf, sample_t *sam
 }
 
 /**
+ * @brief The drunkardmob_scheduler following sequential load blocks
+ * 
+ * @tparam Config 
+ */
+
+template <typename Config>
+class drunkardmob_scheduler : public base_scheduler {
+private:
+    bid_t exec_blk;                   /* the current cache block index used for run */
+public:
+
+    drunkardmob_scheduler(Config& conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {
+        exec_blk = 0;
+    }
+
+    drunkardmob_scheduler(Config& conf, metrics &m) : base_scheduler(m) {
+        exec_blk = 0;
+    }
+
+    /** If the cache block has no walk, then swap out all blocks */
+    template <typename walk_data_t, WalkType walk_type>
+    bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager)
+    {
+        for(bid_t blk = 0; blk < cache.ncblock; blk++) cache.cache_blocks[blk].life++;
+        bid_t blk = choose_blocks(walk_manager);
+        bid_t cache_index = (*(walk_manager.global_blocks))[blk].cache_index;
+        if(cache_index != walk_manager.global_blocks->nblocks) {
+            cache.cache_blocks[cache_index].life = 0;
+        }else {
+            bid_t new_cache_index = swap_block(cache, walk_manager.global_blocks);
+            cache.cache_blocks[new_cache_index].life = 0;
+            load_block_info(cache, driver, walk_manager.global_blocks, new_cache_index, blk);
+        }
+        return blk;
+    }
+
+    bid_t swap_block(graph_cache& cache, graph_block* global_blocks) {
+        bid_t blk = 0;
+        int life = -1;
+        for(bid_t p = 0; p < cache.ncblock; p++) {
+            if(cache.cache_blocks[p].block == NULL) {
+                blk = p; break;
+            }
+            if(cache.cache_blocks[p].life > life) {
+                blk = p;
+                life = cache.cache_blocks[p].life;
+            }
+        }
+        if(cache.cache_blocks[blk].block != NULL) {
+            cache.cache_blocks[blk].block->cache_index = global_blocks->nblocks;
+        }
+        return blk;
+    }
+
+    template <typename walk_data_t, WalkType walk_type>
+    bid_t choose_blocks(graph_walk<walk_data_t, walk_type> &walk_manager) {
+        if(exec_blk == walk_manager.global_blocks->nblocks) {
+            exec_blk = 0;
+        }
+        if(exec_blk == 0) print_walks_distrition(walk_manager);
+        bid_t ret = exec_blk++;
+        return ret;
+    }
+
+    template <typename walk_data_t, WalkType walk_type>
+    void print_walks_distrition(graph_walk<walk_data_t, walk_type> &walk_manager) {
+        std::cout << "walks distribution : ";
+        for(bid_t blk = 0; blk < walk_manager.global_blocks->nblocks; blk++) {
+            std::cout << walk_manager.nblockwalks(blk) << " ";
+        }
+        std::cout << std::endl;
+    }
+};
+
+template <>
+drunkardmob_scheduler<graph_config>::drunkardmob_scheduler(graph_config& conf, metrics &m) : base_scheduler(m) {
+    base_scheduler::setup(&conf);
+    exec_blk = 0;
+}
+
+template <>
+drunkardmob_scheduler<graph_config>::drunkardmob_scheduler(graph_config &conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m)
+{
+    base_scheduler::setup(&conf);
+    exec_blk = 0;
+}
+
+/**
  * The following schedule scheme follow the graph walker scheme
  */
 template <typename Config>

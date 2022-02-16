@@ -56,6 +56,7 @@ public:
 
             /* load `exec_block` walks into memory */
             wid_t nwalks = walk_manager->nblockwalks(select_block);
+            wid_t total_walks = walk_manager->nwalks();
             walk_manager->load_walks(select_block);
 
             vid_t nverts = run_block->block->nverts;
@@ -64,7 +65,7 @@ public:
             {
                 logstream(LOG_DEBUG) << timer.runtime() << "s : run count : " << run_count << std::endl;
                 logstream(LOG_DEBUG) << "nverts = " << nverts << ", nedges = " << nedges << std::endl;
-                logstream(LOG_INFO) << "select_block : " << select_block << ", exec_block : " << exec_block << ", walk num : " << nwalks << ", walksum : " << walk_manager->nwalks() << std::endl;
+                logstream(LOG_INFO) << "select_block : " << select_block << ", exec_block : " << exec_block << ", walk num : " << nwalks << ", walksum : " << total_walks << std::endl;
             }
             exec_block_walk(userprogram, nwalks, sampler);
             walk_manager->dump_walks(select_block);

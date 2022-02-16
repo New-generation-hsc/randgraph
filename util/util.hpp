@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <cstdio>
+#include "logger/logger.hpp"
 
 // for windows mkdir
 #ifdef _WIN32

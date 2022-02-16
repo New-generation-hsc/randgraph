@@ -11,7 +11,7 @@ private:
     int desc;
 public:
     block_desc_manager_t(const std::string&& file_name) {
-        desc = open(file_name.c_str(), O_RDWR | O_CREAT | O_TRUNC | O_APPEND, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
+        desc = open(file_name.c_str(), O_RDWR | O_CREAT | O_APPEND, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
     }
     ~block_desc_manager_t() {
         if(desc > 0) close(desc);
@@ -115,8 +115,7 @@ public:
     {
         block_ndwalk[blk][t] += block_walks[blk][t].size();
         block_nmwalk[blk][t] -= block_walks[blk][t].size();
-        block_desc_manager_t block_desc(get_walk_name(base_name, blk));
-        global_driver->dump_walk(block_desc.get_desc(), block_walks[blk][t]);
+        appendfile(get_walk_name(base_name, blk), block_walks[blk][t].buffer_begin(), block_walks[blk][t].size());
         block_walks[blk][t].clear();
     }
 
@@ -192,23 +191,30 @@ public:
             }
         }
         assert(walks.size() == mwalk_count + dwalk_count);
+
+        clear_walks(exec_block);
     }
 
-    void dump_walks(bid_t exec_block)
+    void clear_walks(bid_t exec_block) 
     {
-        walks.destroy();
         std::fill(block_ndwalk[exec_block].begin(), block_ndwalk[exec_block].end(), 0);
         std::fill(block_nmwalk[exec_block].begin(), block_nmwalk[exec_block].end(), 0);
         block_desc_manager_t block_desc(get_walk_name(base_name, exec_block));
         ftruncate(block_desc.get_desc(), 0);
-        global_blocks->reset_rank(exec_block % nblocks);
-        maxhops[exec_block] = 0;
 
         /* clear the in-memory walks */
         for (tid_t t = 0; t < nthreads; t++)
         {
             block_walks[exec_block][t].clear();
         }
+    }
+
+    void dump_walks(bid_t exec_block)
+    {
+        walks.destroy();
+        
+        global_blocks->reset_rank(exec_block % nblocks);
+        maxhops[exec_block] = 0;
     }
 
     bool test_finished_walks()
