@@ -44,8 +44,8 @@ int main(int argc, const char *argv[])
 
     graph_walk<vid_t, SecondOrder> walk_mangager(conf.base_name, conf.nvertices, conf.nthreads, driver, blocks);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
-    wid_t walks = (wid_t)get_option_int("walks", 100000);
-    hid_t steps = (hid_t)get_option_int("length", 25);
+    wid_t walks = (wid_t)get_option_int("walkpersource", 10);
+    hid_t steps = (hid_t)get_option_int("length", 80);
     real_t p = (real_t)get_option_float("p", 0.5);
     real_t q = (real_t)get_option_float("q", 2.0);
     graph_cache cache(min_value(nmblocks, blocks.nblocks), conf.blocksize);

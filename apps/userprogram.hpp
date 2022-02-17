@@ -15,9 +15,9 @@ public:
         AppType::prologue(walk_manager);
     }
     template <typename walk_data_t, WalkType walk_type>
-    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler)
+    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler, unsigned int *seed)
     {
-        AppType::update_walk(walker, cache, walk_manager, sampler);
+        AppType::update_walk(walker, cache, walk_manager, sampler, seed);
     }
 };
 

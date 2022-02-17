@@ -252,7 +252,13 @@ void sort_vertex_neighbors(const std::string &filename, int fnum, size_t blocksi
     if(new_weights) free(new_weights);
 }
 
-void max_degree(const std::string& filename, int fnum, size_t blocksize) {
+struct cmp {
+    bool operator()(const std::pair<vid_t, vid_t>& p1, const std::pair<vid_t, vid_t>& p2) {
+        return p1.first > p2.first;
+    }
+};
+
+void max_degree(const std::string& filename, int fnum, size_t blocksize, size_t top) {
     std::string vert_block_name = get_vert_blocks_name(filename, blocksize);
     std::string beg_pos_name = get_beg_pos_name(filename, fnum);
     std::vector<vid_t> vblocks = load_graph_blocks<vid_t>(vert_block_name);
@@ -261,8 +267,8 @@ void max_degree(const std::string& filename, int fnum, size_t blocksize) {
     bid_t nblocks = vblocks.size() - 1;
     logstream(LOG_INFO) << "load vblocks and eblocks successfully, block count : " << nblocks << std::endl;
     pre_block_t block;
-    eid_t max_deg = 0;
-    vid_t hub_vertex;
+    using pair_t = std::pair<vid_t, vid_t>;
+    std::priority_queue<pair_t, std::vector<pair_t>, cmp> q;
     for(bid_t blk = 0; blk < nblocks; blk++) {
         block.nverts = vblocks[blk + 1] - vblocks[blk];
         block.start_vert = vblocks[blk];
@@ -270,17 +276,19 @@ void max_degree(const std::string& filename, int fnum, size_t blocksize) {
         pread(vertdesc, block.beg_pos, (block.nverts + 1) * sizeof(eid_t), block.start_vert * sizeof(eid_t));
         for(vid_t vertex = 0; vertex < block.nverts; vertex++) {
             eid_t deg = block.beg_pos[vertex+1] - block.beg_pos[vertex];
-            if(deg > max_deg) {
-                max_deg = deg;
-                hub_vertex = block.start_vert + vertex;
-            }
+            q.push({deg, vertex});
+            if(q.size() > top) q.pop();
         }
 
         logstream(LOG_INFO) << "finish computing the max degree array for block = " << blk << std::endl;
     }
 
     close(vertdesc);
-    std::cout << "max degree vertex = " << hub_vertex << ", degree = " << max_deg << std::endl;
+    while(!q.empty()) {
+        auto p = q.top();
+        std::cout << "vertex : " << p.second << ", deg : " << p.first << std::endl;
+        q.pop();
+    }
 }
 
 
@@ -302,7 +310,7 @@ void max_link_block(const std::string& filename, int fnum, size_t blocksize) {
     pre_block_t block;
     logstream(LOG_INFO) << "start to compute the alias table and accumulate array, nblocks = " << nblocks << std::endl;
     int link_block = 0;
-    vid_t hub_vertex = 0;
+    vid_t hub_vertex;
     for(bid_t blk = 0; blk < nblocks; blk++) {
         block.nverts = vblocks[blk + 1] - vblocks[blk];
         block.nedges = eblocks[blk + 1] - eblocks[blk];
@@ -331,6 +339,55 @@ void max_link_block(const std::string& filename, int fnum, size_t blocksize) {
     }
 
     std::cout << "hub vertex = " << hub_vertex << ", link block = " << link_block << std::endl;
+    close(vertdesc);
+    close(edgedesc);
+}
+
+void calc_vertex_neighbor_dist(const std::string& filename, int fnum, size_t blocksize, vid_t pivot_vertex) {
+    std::string vert_block_name = get_vert_blocks_name(filename, blocksize);
+    std::string edge_block_name = get_edge_blocks_name(filename, blocksize);
+    std::string beg_pos_name = get_beg_pos_name(filename, fnum);
+    std::string csr_name = get_csr_name(filename, fnum);
+
+    std::vector<vid_t> vblocks = load_graph_blocks<vid_t>(vert_block_name);
+    std::vector<eid_t> eblocks = load_graph_blocks<eid_t>(edge_block_name);
+
+    int vertdesc = open(beg_pos_name.c_str(), O_RDONLY);
+    int edgedesc = open(csr_name.c_str(), O_RDONLY);
+    assert(vertdesc > 0 && edgedesc > 0);
+    bid_t blk = get_block(vblocks, pivot_vertex);
+
+    bid_t nblocks = vblocks.size() - 1;
+    logstream(LOG_INFO) << "load vblocks and eblocks successfully, block count : " << nblocks << ", vertex block = " << blk  << std::endl;
+    pre_block_t block;
+    block.nverts = vblocks[blk + 1] - vblocks[blk];
+    block.nedges = eblocks[blk + 1] - eblocks[blk];
+    block.start_vert = vblocks[blk];
+    block.start_edge = eblocks[blk];
+
+    block.beg_pos = (eid_t*)realloc(block.beg_pos, (block.nverts + 1) * sizeof(eid_t));
+    block.csr     = (vid_t*)realloc(block.csr, block.nedges * sizeof(vid_t));
+
+    pread(vertdesc, block.beg_pos, (block.nverts + 1) * sizeof(eid_t), block.start_vert * sizeof(eid_t));
+    pread(edgedesc, block.csr, block.nedges * sizeof(vid_t), block.start_edge * sizeof(vid_t));
+
+    vid_t vertex_off = pivot_vertex - block.start_vert;
+    std::vector<int> block_cnts(nblocks, 0);
+    logstream(LOG_DEBUG) << "vertex off : " << vertex_off << ", off = " << block.beg_pos[vertex_off] - block.start_edge << ", off end = " << block.beg_pos[vertex_off + 1] - block.start_edge << std::endl;
+    for(eid_t off = block.beg_pos[vertex_off] - block.start_edge; off < block.beg_pos[vertex_off + 1] - block.start_edge; off++) {
+        bid_t adj_blk = get_block(vblocks, block.csr[off]);
+        block_cnts[adj_blk]++;
+    }
+
+    int deg_cnts = 0;
+    std::cout << "neighbors block dist : ";
+    for(const auto & cnt : block_cnts) {
+        std::cout << cnt << " ";
+        deg_cnts += cnt;
+    }
+    std::cout << std::endl;
+    std::cout << "vertex degree : " << deg_cnts << std::endl;
+
     close(vertdesc);
     close(edgedesc);
 }

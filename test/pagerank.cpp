@@ -46,8 +46,8 @@ int main(int argc, const char* argv[]) {
     // vid_t numsources = (vid_t)get_option_int("numsources", 4847571);
     vid_t numsources = (vid_t)get_option_int("numsources", 1);
     // wid_t walkpersource = (wid_t)get_option_int("walkpersource", 1);
-    wid_t walkpersource = (wid_t)get_option_int("walkpersource", 100000);
-    hid_t steps = (hid_t)get_option_int("length",25);
+    wid_t walkpersource = (wid_t)get_option_int("walkpersource", 1000000);
+    hid_t steps = (hid_t)get_option_int("length", 6);
     graph_cache cache(min_value(nmblocks, blocks.nblocks), conf.blocksize);
 
     pagerank_conf_t app_conf = { firstsource, numsources, walkpersource, steps, 0.0 };

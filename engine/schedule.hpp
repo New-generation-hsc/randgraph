@@ -251,8 +251,8 @@ graph_scheduler<graph_config>::graph_scheduler(graph_config &conf, sample_t *sam
 
 /**
  * @brief The drunkardmob_scheduler following sequential load blocks
- * 
- * @tparam Config 
+ *
+ * @tparam Config
  */
 
 template <typename Config>
@@ -306,11 +306,17 @@ public:
 
     template <typename walk_data_t, WalkType walk_type>
     bid_t choose_blocks(graph_walk<walk_data_t, walk_type> &walk_manager) {
-        if(exec_blk == walk_manager.global_blocks->nblocks) {
-            exec_blk = 0;
+        // if(exec_blk == walk_manager.global_blocks->nblocks) {
+        //     exec_blk = 0;
+        // }
+        // if(exec_blk == 0) print_walks_distrition(walk_manager);
+        // bid_t ret = exec_blk++;
+        // return ret;
+        if(exec_blk == 0) {
+            print_walks_distrition(walk_manager);
+            exec_blk = walk_manager.global_blocks->nblocks;
         }
-        if(exec_blk == 0) print_walks_distrition(walk_manager);
-        bid_t ret = exec_blk++;
+        bid_t ret = --exec_blk;
         return ret;
     }
 
@@ -552,11 +558,12 @@ private:
     }
 
     template<typename walk_data_t, WalkType walk_type>
-    bid_t swap_block(graph_cache &cache, graph_walk<walk_data_t, walk_type>& walk_manager) {
+    bid_t swap_block(graph_cache &cache, graph_walk<walk_data_t, walk_type>& walk_manager, bid_t exclude_cache_index) {
         bid_t blk = 0;
         int life = -1;
         wid_t active_walks_cnt = 0xffffffff;
         for(bid_t p = 0; p < cache.ncblock; ++p) {
+            if(p == exclude_cache_index) continue;
             if(cache.cache_blocks[p].block == NULL) {
                 blk = p; break;
             }
@@ -587,7 +594,7 @@ public:
 #ifdef TESTDEBUG
         logstream(LOG_DEBUG) << "second-order schedule blocks [" << pblk << ", " << cblk << "]" << std::endl;
 #endif
-        
+
         _m.start_time("second_order_scheduler_swap_blocks");
         /* increase the cache block life */
         for(bid_t p = 0; p < cache.ncblock; ++p) cache.cache_blocks[p].life++;
@@ -595,18 +602,18 @@ public:
         if(p_cache_index != walk_manager.global_blocks->nblocks) {
             cache.cache_blocks[p_cache_index].life = 0;
         }else {
-            bid_t new_cache_index = swap_block(cache, walk_manager);
-            cache.cache_blocks[new_cache_index].life = 0;
-            load_block_info(cache, driver, walk_manager.global_blocks, new_cache_index, pblk);
+            p_cache_index = swap_block(cache, walk_manager, walk_manager.global_blocks->nblocks);
+            cache.cache_blocks[p_cache_index].life = 0;
+            load_block_info(cache, driver, walk_manager.global_blocks, p_cache_index, pblk);
         }
 
         bid_t cache_index = (*(walk_manager.global_blocks))[cblk].cache_index;
         if(cache_index != walk_manager.global_blocks->nblocks) {
             cache.cache_blocks[cache_index].life = 0;
         }else {
-            bid_t new_cache_index = swap_block(cache, walk_manager);
-            cache.cache_blocks[new_cache_index].life = 0;
-            load_block_info(cache, driver, walk_manager.global_blocks, new_cache_index, cblk);
+            cache_index = swap_block(cache, walk_manager, p_cache_index);
+            cache.cache_blocks[cache_index].life = 0;
+            load_block_info(cache, driver, walk_manager.global_blocks, cache_index, cblk);
         }
         _m.stop_time("second_order_scheduler_swap_blocks");
         return transform<walk_data_t, walk_type>(pblk, cblk, walk_manager);

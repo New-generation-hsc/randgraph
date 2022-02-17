@@ -16,6 +16,7 @@ public:
     graph_driver                        *driver;
     graph_config                        *conf;
     graph_timer                         timer;
+    std::vector<unsigned int>           seeds;
 
     // statistic metric
     metrics &_m;
@@ -25,6 +26,10 @@ public:
         walk_manager = &manager;
         driver        = &_driver;
         conf          = &_conf;
+        seeds = std::vector<unsigned int>(conf->nthreads);
+        for(tid_t tid = 0; tid < conf->nthreads; tid++) {
+            seeds[tid] = time(NULL) + tid;
+        }
     }
 
     template<typename AppType, typename AppConfig>
@@ -64,7 +69,7 @@ public:
             if(run_count % 1 == 0)
             {
                 logstream(LOG_DEBUG) << timer.runtime() << "s : run count : " << run_count << std::endl;
-                logstream(LOG_DEBUG) << "nverts = " << nverts << ", nedges = " << nedges << std::endl;
+                logstream(LOG_DEBUG) << "nverts = " << nverts << ", nedges = " << nedges << ", walk density = " << (real_t)nwalks / nedges << std::endl;
                 logstream(LOG_INFO) << "select_block : " << select_block << ", exec_block : " << exec_block << ", walk num : " << nwalks << ", walksum : " << total_walks << std::endl;
             }
             exec_block_walk(userprogram, nwalks, sampler);
@@ -91,7 +96,7 @@ public:
         {
             #pragma omp parallel for schedule(static)
             for(wid_t idx = 0; idx < nwalks; idx++) {
-                userprogram.update_walk(walk_manager->walks[idx], cache, walk_manager, sampler);
+                userprogram.update_walk(walk_manager->walks[idx], cache, walk_manager, sampler, &seeds[omp_get_thread_num()]);
             }
         }
         _m.stop_time("exec_block_walk");
