@@ -29,7 +29,7 @@ inline bid_t total_blocks<SecondOrder>(bid_t nblocks) {
     return nblocks * nblocks;
 }
 
-template<typename walk_data_t, WalkType walk_type> 
+template<typename walk_data_t, WalkType walk_type>
 class graph_walk {
 public:
     std::string base_name;  /* the dataset base name, indicate the walks store path */
@@ -54,6 +54,8 @@ public:
         bid_t totblocks = total_blocks<walk_type>(nblocks);
         maxhops.resize(totblocks, 0);
 
+        walks.alloc(nthreads * MAX_TWALKS);
+
         block_nmwalk.resize(totblocks);
         for (bid_t blk = 0; blk < totblocks; blk++)
         {
@@ -77,6 +79,12 @@ public:
                 block_walks[blk][tid].alloc(MAX_TWALKS);
             }
         }
+
+        for (bid_t blk = 0; blk < total_blocks<walk_type>(this->nblocks); blk++)
+        {
+            std::string walk_name = get_walk_name(base_name, blk);
+            if(test_exists(walk_name)) unlink(walk_name.c_str());
+        }
     }
 
     ~graph_walk()
@@ -96,6 +104,7 @@ public:
             std::string walk_name = get_walk_name(base_name, blk);
             if(test_exists(walk_name)) unlink(walk_name.c_str());
         }
+        walks.destroy();
     }
 
     void move_walk(const walker_t<walk_data_t> &walker)
@@ -173,14 +182,11 @@ public:
         return walksum;
     }
 
-    void load_walks(bid_t exec_block)
-    {
-        wid_t mwalk_count = this->nmwalks(exec_block), dwalk_count = this->ndwalks(exec_block);
-        walks.alloc(mwalk_count + dwalk_count);
-        block_desc_manager_t block_desc(get_walk_name(base_name, exec_block));
-        global_driver->load_walk(block_desc.get_desc(), dwalk_count, walks);
+    size_t load_memory_walks(bid_t exec_block) {
+        wid_t mwalk_count = this->nmwalks(exec_block);
+        walks.clear();
 
-        /** load the in-memory */
+        /* load in memory walks */
         for (tid_t t = 0; t < nthreads; t++)
         {
             if (block_walks[exec_block][t].empty())
@@ -190,29 +196,31 @@ public:
                 walks.push_back(block_walks[exec_block][t][w]);
             }
         }
-        assert(walks.size() == mwalk_count + dwalk_count);
 
-        clear_walks(exec_block);
-    }
-
-    void clear_walks(bid_t exec_block) 
-    {
-        std::fill(block_ndwalk[exec_block].begin(), block_ndwalk[exec_block].end(), 0);
+        /* clear memory walks */
         std::fill(block_nmwalk[exec_block].begin(), block_nmwalk[exec_block].end(), 0);
-        block_desc_manager_t block_desc(get_walk_name(base_name, exec_block));
-        ftruncate(block_desc.get_desc(), 0);
-
-        /* clear the in-memory walks */
         for (tid_t t = 0; t < nthreads; t++)
         {
             block_walks[exec_block][t].clear();
         }
+
+        assert(mwalk_count == walks.size());
+        return walks.size();
+    }
+
+    size_t load_disk_walks(bid_t exec_block, wid_t walk_cnt, wid_t loaded_walks) {
+        walks.clear();
+        block_desc_manager_t block_desc(get_walk_name(base_name, exec_block));
+        global_driver->load_walk(block_desc.get_desc(), walk_cnt, loaded_walks, walks);
+        return walks.size();
     }
 
     void dump_walks(bid_t exec_block)
     {
-        walks.destroy();
-        
+        std::fill(block_ndwalk[exec_block].begin(), block_ndwalk[exec_block].end(), 0);
+        block_desc_manager_t block_desc(get_walk_name(base_name, exec_block));
+        ftruncate(block_desc.get_desc(), 0);
+
         global_blocks->reset_rank(exec_block % nblocks);
         maxhops[exec_block] = 0;
     }

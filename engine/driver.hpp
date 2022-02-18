@@ -14,12 +14,12 @@
 class graph_driver {
 public:
     graph_driver() { }
-    
-    void load_block_vertex(int fd, eid_t *buf, const block_t &block) { 
+
+    void load_block_vertex(int fd, eid_t *buf, const block_t &block) {
         load_block_range(fd, buf, block.nverts + 1, block.start_vert * sizeof(eid_t));
     }
 
-    void load_block_degree(int fd, vid_t *buf, const block_t &block) { 
+    void load_block_degree(int fd, vid_t *buf, const block_t &block) {
         load_block_range(fd, buf, block.nverts, block.start_vert * sizeof(vid_t));
     }
 
@@ -40,8 +40,9 @@ public:
     }
 
     template<typename walk_data_t>
-    void load_walk(int fd, size_t cnt, graph_buffer<walk_data_t> &walks) {
-        load_block_range(fd, walks.buffer_begin(), cnt, 0);
+    void load_walk(int fd, size_t cnt, size_t loaded_cnt, graph_buffer<walk_data_t> &walks) {
+        off_t off = loaded_cnt * sizeof(walk_data_t);
+        load_block_range(fd, walks.buffer_begin(), cnt, off);
         walks.set_size(cnt);
     }
 

@@ -92,7 +92,6 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
     bid_t cur_blk = walk_manager->global_blocks->get_block(cur_vertex);
     bid_t prev_blk = walk_manager->global_blocks->get_block(prev_vertex);
     // unsigned seed = (unsigned)(cur_vertex + prev_vertex + hop + tid + time(NULL));
-
     bid_t cur_cache_index = (*(walk_manager->global_blocks))[cur_blk].cache_index, prev_cache_index = (*(walk_manager->global_blocks))[prev_blk].cache_index;
     bid_t nblocks = walk_manager->global_blocks->nblocks;
     assert(cur_cache_index != nblocks && prev_cache_index != nblocks);
@@ -134,7 +133,7 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
             {
                 walk_context<BIASEDSECONDORDERCTX> ctx(param, cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
                                                        seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail,
-                                                       cur_block->weights + adj_head, cur_block->weights + adj_tail, prev_block->acc_weights + prev_adj_head, prev_block->acc_weights + prev_adj_tail);
+                                                       cur_block->weights + adj_head, cur_block->weights + adj_tail, prev_block->weights + prev_adj_head, prev_block->weights + prev_adj_tail);
                 next_vertex = vertex_sample(ctx, sampler);
             }
         }

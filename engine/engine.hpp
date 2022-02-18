@@ -51,6 +51,7 @@ public:
         logstream(LOG_INFO) << "Random walks start executing, please wait for a minute." << std::endl;
         timer.start_time();
         int run_count = 0;
+        wid_t interval_max_walks = (wid_t)conf->nthreads * MAX_TWALKS;
         while(!walk_manager->test_finished_walks()) {
             bid_t select_block = block_scheduler->schedule(*cache, *driver, *walk_manager);
             bid_t exec_block = select_block % walk_manager->global_blocks->nblocks;
@@ -60,19 +61,34 @@ public:
             run_block->block->status = USING;
 
             /* load `exec_block` walks into memory */
-            wid_t nwalks = walk_manager->nblockwalks(select_block);
+            wid_t ndwalks = walk_manager->ndwalks(select_block);
             wid_t total_walks = walk_manager->nwalks();
-            walk_manager->load_walks(select_block);
 
             vid_t nverts = run_block->block->nverts;
             eid_t nedges = run_block->block->nedges;
+
+            wid_t nwalks = walk_manager->load_memory_walks(select_block);
+            wid_t block_nwalks = nwalks + ndwalks;
             if(run_count % 1 == 0)
             {
                 logstream(LOG_DEBUG) << timer.runtime() << "s : run count : " << run_count << std::endl;
-                logstream(LOG_DEBUG) << "nverts = " << nverts << ", nedges = " << nedges << ", walk density = " << (real_t)nwalks / nedges << std::endl;
-                logstream(LOG_INFO) << "select_block : " << select_block << ", exec_block : " << exec_block << ", walk num : " << nwalks << ", walksum : " << total_walks << std::endl;
+                logstream(LOG_DEBUG) << "nverts = " << nverts << ", nedges = " << nedges << ", walk density = " << (real_t)block_nwalks / nedges << std::endl;
+                logstream(LOG_INFO) << "select_block : " << select_block << ", exec_block : " << exec_block << std::endl;
+                logstream(LOG_INFO) << "memory walk num : " << nwalks << ", disk walk num : " << ndwalks << ", walksum : " << total_walks << std::endl;
             }
             exec_block_walk(userprogram, nwalks, sampler);
+            wid_t remain_walks = ndwalks, loaded_walks = 0;
+            while(remain_walks > 0) {
+                wid_t interval_walks = std::min(remain_walks, interval_max_walks);
+                remain_walks -= interval_walks;
+                nwalks = walk_manager->load_disk_walks(select_block, interval_walks, loaded_walks);
+                loaded_walks += interval_walks;
+
+                if(run_count % 1 == 0) {
+                    logstream(LOG_DEBUG) << "exec_block : " << exec_block << ", disk interval walks : " << nwalks << std::endl;
+                }
+                exec_block_walk(userprogram, nwalks, sampler);
+            }
             walk_manager->dump_walks(select_block);
             run_block->block->status = USED;
             run_count++;
