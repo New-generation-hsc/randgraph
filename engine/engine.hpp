@@ -15,7 +15,7 @@ public:
     graph_walk<walk_data_t, walk_type>  *walk_manager;
     graph_driver                        *driver;
     graph_config                        *conf;
-    graph_timer                         timer;
+    graph_timer                         gtimer;
     std::vector<unsigned int>           seeds;
 
     // statistic metric
@@ -49,7 +49,7 @@ public:
     {
         logstream(LOG_DEBUG) << "graph blocks : " << walk_manager->global_blocks->nblocks << ", memory blocks : " << cache->ncblock << std::endl;
         logstream(LOG_INFO) << "Random walks start executing, please wait for a minute." << std::endl;
-        timer.start_time();
+        gtimer.start_time();
         int run_count = 0;
         wid_t interval_max_walks = (wid_t)conf->nthreads * MAX_TWALKS;
         while(!walk_manager->test_finished_walks()) {
@@ -71,7 +71,7 @@ public:
             wid_t block_nwalks = nwalks + ndwalks;
             if(run_count % 1 == 0)
             {
-                logstream(LOG_DEBUG) << timer.runtime() << "s : run count : " << run_count << std::endl;
+                logstream(LOG_DEBUG) << gtimer.runtime() << "s : run count : " << run_count << std::endl;
                 logstream(LOG_DEBUG) << "nverts = " << nverts << ", nedges = " << nedges << ", walk density = " << (real_t)block_nwalks / nedges << std::endl;
                 logstream(LOG_INFO) << "select_block : " << select_block << ", exec_block : " << exec_block << std::endl;
                 logstream(LOG_INFO) << "memory walk num : " << nwalks << ", disk walk num : " << ndwalks << ", walksum : " << total_walks << std::endl;
@@ -93,12 +93,13 @@ public:
             run_block->block->status = USED;
             run_count++;
         }
-        logstream(LOG_DEBUG) << timer.runtime() << "s, total run count : " << run_count << std::endl;
+        logstream(LOG_DEBUG) << gtimer.runtime() << "s, total run count : " << run_count << std::endl;
     }
 
     template <typename AppType, typename AppConfig>
     void epilogue(userprogram_t<AppType, AppConfig> &userprogram)
     {
+        userprogram.epilogue();
         logstream(LOG_INFO) << "  ================= FINISHED ======================  " << std::endl;
     }
 

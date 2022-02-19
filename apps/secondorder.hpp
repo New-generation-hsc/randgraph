@@ -7,6 +7,7 @@
 #include "engine/walk.hpp"
 #include "engine/sample.hpp"
 #include "engine/context.hpp"
+#include "util/timer.hpp"
 
 template <>
 inline vid_t get_vertex_from_walk<vid_t>(const vid_t &data)
@@ -26,6 +27,7 @@ private:
     wid_t _walkpersource;
     hid_t _hops;
     second_order_param_t param;
+    walk_timer wtimer;
 
 public:
     second_order_app_t(wid_t nwalks, hid_t steps, second_order_param_t app_param)
@@ -58,6 +60,7 @@ public:
 
     void epilogue()
     {
+        wtimer.report();
     }
 
     wid_t get_numsources() { return _walkpersource; }
@@ -67,6 +70,9 @@ public:
 template <>
 void second_order_app_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOrder> *walk_manager)
 {
+    wtimer.register_entry("walker_update");
+    wtimer.register_entry("vertex_sample");
+
     #pragma omp parallel for schedule(static)
     for (vid_t vertex = 0; vertex < walk_manager->nvertices; vertex++)
     {
@@ -96,6 +102,7 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
     bid_t nblocks = walk_manager->global_blocks->nblocks;
     assert(cur_cache_index != nblocks && prev_cache_index != nblocks);
 
+    wtimer.start_time("walker_update");
     while (cur_cache_index != nblocks && hop > 0)
     {
         cache_block *cur_block = &(cache->cache_blocks[cur_cache_index]);
@@ -107,6 +114,7 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
         eid_t prev_adj_head = prev_block->beg_pos[prev_off] - prev_block->block->start_edge, prev_adj_tail = prev_block->beg_pos[prev_off + 1] - prev_block->block->start_edge;
 
         vid_t next_vertex = 0;
+        wtimer.start_time("vertex_sample");
         if (cur_block->weights == nullptr && cur_block->acc_weights == nullptr)
         {
             walk_context<SECONDORDERCTX> ctx(param, cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
@@ -137,6 +145,7 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
                 next_vertex = vertex_sample(ctx, sampler);
             }
         }
+        wtimer.stop_time("vertex_sample");
         prev_vertex = cur_vertex;
         cur_vertex = next_vertex;
 
@@ -148,6 +157,7 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
         }
         hop--;
     }
+    wtimer.stop_time("walker_update");
 
     if (hop > 0)
     {

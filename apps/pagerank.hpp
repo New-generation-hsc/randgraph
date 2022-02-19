@@ -54,6 +54,8 @@ public:
         // update_strategy_t<randomwalk_conf_t, walk_data_t, walk_type, SampleType>::update_walk(_conf, walker, cache, walk_manager, sampler);
     }
 
+    void epilogue() {  }
+
     wid_t get_numsources() { return _conf.numsources; }
     hid_t get_hops() { return _conf.steps; }
 };

@@ -537,7 +537,6 @@ public:
             size_t pos = std::upper_bound(adj_weights.begin(), adj_weights.end(), randval) - adj_weights.begin();
             target_vertex = comm_neighbors[pos];
         }
-        logstream(LOG_DEBUG) << "opt_alias_sample : " << ctx.cur_vertex << std::endl;
         return target_vertex;
     }
 

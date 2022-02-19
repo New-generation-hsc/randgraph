@@ -19,6 +19,10 @@ public:
     {
         AppType::update_walk(walker, cache, walk_manager, sampler, seed);
     }
+
+    void epilogue() {
+        AppType::epilogue();
+    }
 };
 
 #endif

@@ -7,26 +7,26 @@
  * @section LICENSE
  *
  * Copyright [2012] [Aapo Kyrola, Guy Blelloch, Carlos Guestrin / Carnegie Mellon University]
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- 
+
  *
  * @section DESCRIPTION
  *
- * Metrics. 
+ * Metrics.
  */
 
-  
+
 #ifndef GRAPHWALKER_METRICS
 #define GRAPHWALKER_METRICS
 
@@ -42,7 +42,7 @@
 
 
 enum metrictype {REAL, INTEGER, TIME, STRING, VECTOR};
-  
+
 // Data structure for storing metric entries
 // NOTE: This data structure is not very optimal, should
 // of course use inheritance. But for this purpose,
@@ -57,10 +57,10 @@ struct metrics_entry {
   std::string stringval;
   std::vector<double> v;
   timeval start_time;
-    double lasttime;
-      
-  metrics_entry() {} 
-      
+  double lasttime;
+
+  metrics_entry() {}
+
   inline metrics_entry(double firstvalue, metrictype _valtype) {
     minvalue = firstvalue;
     maxvalue = firstvalue;
@@ -91,8 +91,8 @@ struct metrics_entry {
       maxvalue = std::max(v,maxvalue);
     }
   }
-  
-  
+
+
   inline void add(double x) {
     adj(x);
     value += x;
@@ -102,8 +102,8 @@ struct metrics_entry {
       v.push_back(x);
     }
   }
-    
-    
+
+
 
 
   inline void set(double v) {
@@ -123,7 +123,7 @@ struct metrics_entry {
     v[i] += x;
     adj(v[i]);
   }
-  
+
   inline void set_vector_entry(size_t i, double x) {
     if (v.size() < i + 1) v.resize(i + 1);
     count = v.size();
@@ -136,7 +136,7 @@ struct metrics_entry {
       adj(v[i]);
     }
   }
-  
+
   inline void timer_start() {
       gettimeofday(&start_time, NULL);
 
@@ -144,29 +144,29 @@ struct metrics_entry {
   inline void timer_stop() {
       timeval end;
       gettimeofday(&end, NULL);
-      lasttime = end.tv_sec - start_time.tv_sec + ((double)(end.tv_usec - start_time.tv_usec)) / 1.0E6;      
+      lasttime = end.tv_sec - start_time.tv_sec + ((double)(end.tv_usec - start_time.tv_usec)) / 1.0E6;
       add(lasttime);
   }
 };
 
 class imetrics_reporter {
-      
+
   public:
       virtual ~imetrics_reporter() {}
       virtual void do_report(std::string name, std::string id, std::map<std::string, metrics_entry> &  entries) = 0;
-  };    
+  };
 
   /**
  * Metrics instance for logging metrics of a single object type.
  * Name of the metrics instance is set on construction.
  */
 class metrics {
-  
+
   std::string name, ident;
   std::map<std::string, metrics_entry> entries;
     mutex mlock;
-      
-public: 
+
+public:
   inline metrics(std::string _name = "", std::string _id = "") : name(_name), ident (_id) {
       this->set("app", _name);
   }
@@ -174,14 +174,14 @@ public:
   inline void clear() {
     entries.clear();
   }
-    
-    
+
+
     inline std::string iterkey(std::string key, int iter) {
         char s[256];
         sprintf(s, "%s.%d", key.c_str(), iter);
         return std::string(s);
     }
-    
+
   /**
    * Add to an existing value or create new.
    */
@@ -194,7 +194,7 @@ public:
     }
       mlock.unlock();
   }
-  
+
   inline void add_to_vector(std::string key, double value) {
       if (entries.count(key) == 0) {
         entries[key] = metrics_entry(value, VECTOR);
@@ -209,16 +209,16 @@ public:
       }
       entries[key].add_vector_entry(idx, value);
   }
-  
+
   inline void set(std::string key, size_t value) {
     set(key, (double)value, INTEGER);
   }
-      
-    
+
+
     inline void set(std::string key, int value) {
         set(key, (double)value, INTEGER);
-    }  
-    
+    }
+
   inline void set(std::string key, double value, metrictype type = REAL) {
     if (entries.count(key) == 0) {
       entries[key] = metrics_entry(value, type);
@@ -226,7 +226,7 @@ public:
       entries[key].set(value);
     }
   }
-  
+
   inline void set_integer(std::string key, size_t value) {
     if (entries.count(key) == 0) {
       entries[key] = metrics_entry((double)value, INTEGER);
@@ -234,7 +234,7 @@ public:
       entries[key].set((double)value);
     }
   }
-  
+
   inline void set(std::string key, std::string s) {
     if (entries.count(key) == 0) {
       entries[key] = metrics_entry(s);
@@ -246,62 +246,62 @@ public:
   inline void set_vector_entry_integer(std::string key, size_t idx, size_t value) {
     set_vector_entry(key, idx, (double)(value));
   }
-  
+
   inline void set_vector_entry(std::string key, size_t idx, double value) {
       mlock.lock();
 
     if (entries.count(key) == 0) {
       entries[key] = metrics_entry(VECTOR);
-    } 
+    }
     entries[key].set_vector_entry(idx, value);
       mlock.unlock();
   }
-  
+
   inline void start_time(std::string key) {
       mlock.lock();
 
     if (entries.count(key) == 0) {
       entries[key] = metrics_entry(TIME);
-    } 
+    }
     entries[key].timer_start();
       mlock.unlock();
 
   }
-    
+
   metrics_entry start_time() {
-      metrics_entry me(TIME);  
+      metrics_entry me(TIME);
       me.timer_start();
       return me;
   }
-    
-      
-    
+
+
+
   inline void stop_time(metrics_entry me, std::string key, bool show=false) {
       me.timer_stop();
       mlock.lock();
 
       if (entries.count(key) == 0) {
           entries[key] = metrics_entry(TIME);
-      } 
+      }
       entries[key].add(me.lasttime); // not thread safe
-      if (show) 
+      if (show)
           std::cout << key << ": " << me.lasttime << " secs." << std::endl;
       mlock.unlock();
-      
+
   }
-    
+
     inline void stop_time(metrics_entry me, std::string key, int iternum, bool show=false) {
         me.timer_stop();
         mlock.lock();
-        
+
         double t = me.lasttime;
         if (entries.count(key) == 0) {
             entries[key] = metrics_entry(TIME);
-        } 
+        }
         entries[key].add(t); // not thread safe
-        if (show) 
+        if (show)
             std::cout << key << ": " << me.lasttime << " secs." << std::endl;
-        
+
         char s[256];
         sprintf(s, "%s.%d", key.c_str(), iternum);
         std::string ikey(s);
@@ -309,29 +309,29 @@ public:
             entries[ikey] = metrics_entry(TIME);
         }
         entries[ikey].add(t);
-        
+
         mlock.unlock();
-        
+
     }
-    
-    
+
+
     inline void stop_time(std::string key, bool show = false) {
         entries[key].timer_stop();
-        if (show) 
+        if (show)
             std::cout << key << ": " << entries[key].lasttime << " secs." << std::endl;
     }
-      
+
   inline metrics_entry get(std::string key) {
     return entries[key];
   }
-    
-    
+
+
   void report(imetrics_reporter & reporter) {
         if (name != "") {
             reporter.do_report(name, ident, entries);
         }
     }
-    
+
 };
 
 #endif
