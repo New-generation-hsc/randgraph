@@ -358,9 +358,52 @@ private:
 
     std::pair<bid_t, bid_t> choose_blocks(graph_cache &cache, graph_walk<vid_t, SecondOrder> &walk_manager)
     {
-        bid_t blk = walk_manager.max_walks_block();
+        // a much easy implementation
         bid_t nblocks = walk_manager.global_blocks->nblocks;
-        return { blk / nblocks, blk % nblocks };
+        std::pair<bid_t, bid_t> ans;
+        bid_t candidate_block = 0;
+        wid_t nwalks = 0;
+        for(bid_t blk = 0; blk < walk_manager.global_blocks->nblocks; blk++) {
+            wid_t walk_cnt = 0;
+            for(bid_t index = 0; index < cache.ncblock; index++) {
+                if(cache.cache_blocks[index].block != NULL) {
+                    bid_t cblk = cache.cache_blocks[index].block->blk;
+                    walk_cnt += walk_manager.nblockwalks(cblk * nblocks + blk);
+                    if(blk != cblk) {
+                        walk_cnt += walk_manager.nblockwalks(blk * nblocks + cblk);
+                    }
+                }
+            }
+            if(walk_cnt > nwalks) {
+                candidate_block = blk;
+                nwalks = walk_cnt;
+            }
+        }
+
+        ans.first = candidate_block;
+        nwalks = 0;
+
+        for(bid_t blk = 0; blk < walk_manager.global_blocks->nblocks; blk++) {
+            if(blk == ans.first) continue;
+            wid_t walk_cnt = 0;
+            for(bid_t index = 0; index < cache.ncblock; index++) {
+                if(cache.cache_blocks[index].block != NULL) {
+                    bid_t cblk = cache.cache_blocks[index].block->blk;
+                    walk_cnt += walk_manager.nblockwalks(cblk * nblocks + blk);
+                    if(blk != cblk) {
+                        walk_cnt += walk_manager.nblockwalks(blk * nblocks + cblk);
+                    }
+                }
+            }
+            walk_cnt += walk_manager.nblockwalks(blk * nblocks + ans.first);
+            walk_cnt += walk_manager.nblockwalks(ans.first * nblocks + blk);
+            if(walk_cnt > nwalks) {
+                candidate_block = blk;
+                nwalks = walk_cnt;
+            }
+        }
+        ans.second = candidate_block;
+        return ans;
     }
 
     template<typename walk_data_t, WalkType walk_type>
