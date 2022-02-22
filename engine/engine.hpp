@@ -45,7 +45,7 @@ public:
     }
 
     template <typename BaseType, typename Config, typename AppType, typename AppConfig>
-    void run(userprogram_t<AppType, AppConfig> &userprogram, scheduler<BaseType, Config> *block_scheduler, sample_policy_t *sampler)
+    void run(userprogram_t<AppType, AppConfig> &userprogram, scheduler<BaseType, Config> *block_scheduler, sample_context_t *sampler_context)
     {
         logstream(LOG_DEBUG) << "graph blocks : " << walk_manager->global_blocks->nblocks << ", memory blocks : " << cache->ncblock << std::endl;
         logstream(LOG_INFO) << "Random walks start executing, please wait for a minute." << std::endl;
@@ -69,10 +69,11 @@ public:
 
             wid_t nwalks = walk_manager->load_memory_walks(select_block);
             wid_t block_nwalks = nwalks + ndwalks;
+            sample_policy_t *sampler = sampler_context->sample_switch(run_block, block_nwalks, total_walks);
             if(run_count % 1 == 0)
             {
                 logstream(LOG_DEBUG) << gtimer.runtime() << "s : run count : " << run_count << std::endl;
-                logstream(LOG_DEBUG) << "nverts = " << nverts << ", nedges = " << nedges << ", walk density = " << (real_t)block_nwalks / nedges << std::endl;
+                logstream(LOG_DEBUG) << "nverts = " << nverts << ", nedges = " << nedges << ", walk density = " << (real_t)block_nwalks / nverts << ", sampler : " << sampler->sample_name() << std::endl;
                 logstream(LOG_INFO) << "select_block : " << select_block << ", exec_block : " << exec_block << std::endl;
                 logstream(LOG_INFO) << "memory walk num : " << nwalks << ", disk walk num : " << ndwalks << ", walksum : " << total_walks << std::endl;
             }

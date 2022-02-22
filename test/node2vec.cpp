@@ -61,6 +61,7 @@ int main(int argc, const char *argv[])
     reject_sample_t reject_sampler;
     second_order_soopt_sample_t soopt_sampler;
     second_order_opt_alias_sample_t opt_alias_sampler;
+    its_sample_t acc_its_sampler(true);
 
     // scheduler *scheduler = nullptr;
     sample_policy_t *sampler = nullptr;
@@ -75,15 +76,19 @@ int main(int argc, const char *argv[])
         sampler = &soopt_sampler;
     else if(type == "opt_alias")
         sampler = &opt_alias_sampler;
+    else if(type == "acc_its")
+        sampler = &acc_its_sampler;
     else
         sampler = &its_sampler;
 
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
     scheduler<second_order_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, sampler, m);
+    complex_sample_context_t sample_context(sampler, &acc_its_sampler);
+    // naive_sample_context_t sample_context(sampler);
 
     engine.prologue(userprogram);
-    engine.run(userprogram, &walk_scheduler, sampler);
+    engine.run(userprogram, &walk_scheduler, &sample_context);
     engine.epilogue(userprogram);
 
     metrics_report(m);

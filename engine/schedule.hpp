@@ -39,6 +39,7 @@ protected:
     int prob_desc, alias_desc, acc_wht_desc; /* the alias table descriptor and accumulate weight descriptor */
     metrics &_m;
     bool _weighted, use_alias, use_acc_weight;
+    bool saved_use_alias;
 
 public:
     base_scheduler(graph_config *conf, metrics &m) : _m(m)
@@ -48,6 +49,7 @@ public:
         _weighted = false;
         use_alias = false;
         use_acc_weight = false;
+        saved_use_alias = false;
         this->setup(conf);
     }
 
@@ -57,6 +59,7 @@ public:
         _weighted = false;
         use_alias = sampler->use_alias;
         use_acc_weight = sampler->use_acc_weight;
+        saved_use_alias = sampler->use_alias;
         this->setup(conf);
     }
 
@@ -66,6 +69,7 @@ public:
         _weighted = false;
         use_alias = sampler->use_alias;
         use_acc_weight = sampler->use_acc_weight;
+        saved_use_alias = sampler->use_alias;
     }
 
     base_scheduler(metrics& m) : _m(m) {
@@ -74,6 +78,7 @@ public:
         _weighted = false;
         use_alias = false;
         use_acc_weight = false;
+        saved_use_alias = false;
     }
 
     void setup(graph_config *conf) {
@@ -108,6 +113,7 @@ public:
 
     void load_block_info(graph_cache &cache, graph_driver &driver, graph_block *global_blocks, bid_t cache_index, bid_t block_index)
     {
+        _m.start_time("load_block_info");
         cache.cache_blocks[cache_index].block = &global_blocks->blocks[block_index];
         cache.cache_blocks[cache_index].block->status = ACTIVE;
         cache.cache_blocks[cache_index].block->cache_index = cache_index;
@@ -120,6 +126,7 @@ public:
         if (_weighted)
         {
             if(use_alias) {
+                logstream(LOG_DEBUG) << "load block info alias table for block : " << block_index << std::endl;
                 cache.cache_blocks[cache_index].prob = (real_t *)realloc(cache.cache_blocks[cache_index].prob, global_blocks->blocks[block_index].nedges * sizeof(real_t));
                 driver.load_block_prob(prob_desc, cache.cache_blocks[cache_index].prob, global_blocks->blocks[block_index]);
                 cache.cache_blocks[cache_index].alias = (vid_t*)realloc(cache.cache_blocks[cache_index].alias, global_blocks->blocks[block_index].nedges * sizeof(vid_t));
@@ -127,13 +134,17 @@ public:
             }
 
             if(use_acc_weight) {
+                logstream(LOG_DEBUG) << "load block info acc weights  for block : " << block_index << std::endl;
+                cache.cache_blocks[cache_index].prob = (real_t *)realloc(cache.cache_blocks[cache_index].prob, global_blocks->blocks[block_index].nedges * sizeof(real_t));
                 cache.cache_blocks[cache_index].acc_weights = (real_t *)realloc(cache.cache_blocks[cache_index].acc_weights, global_blocks->blocks[block_index].nedges * sizeof(real_t));
                 driver.load_block_weight(acc_wht_desc, cache.cache_blocks[cache_index].acc_weights, global_blocks->blocks[block_index]);
             } else {
+                logstream(LOG_DEBUG) << "load block info normal weights  for block : " << block_index << std::endl;
                 cache.cache_blocks[cache_index].weights = (real_t *)realloc(cache.cache_blocks[cache_index].weights, global_blocks->blocks[block_index].nedges * sizeof(real_t));
                 driver.load_block_weight(whtdesc, cache.cache_blocks[cache_index].weights, global_blocks->blocks[block_index]);
             }
         }
+        _m.stop_time("load_block_info");
     }
 
     void destory() {
@@ -582,6 +593,19 @@ private:
         return blk;
     }
 
+    template<typename walk_data_t, WalkType walk_type>
+    void check_walks_state(graph_walk<walk_data_t, walk_type> &walk_manager, bid_t pblk, bid_t cblk) {
+        bid_t select_block = pblk * walk_manager.global_blocks->nblocks + cblk;
+        wid_t nwalks = walk_manager.nblockwalks(select_block);
+        block_t &block_info = (*(walk_manager.global_blocks))[cblk];
+        vid_t nverts = block_info.nverts;
+        if((double)nwalks < 0.8 * nverts) {
+            if(saved_use_alias) use_alias = false;
+        } else {
+            if(saved_use_alias) use_alias = true;
+        }
+    }
+
 public:
     second_order_scheduler_t(Config& conf, metrics& m) : base_scheduler(m) { }
     second_order_scheduler_t(Config &conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {}
@@ -594,6 +618,8 @@ public:
 #ifdef TESTDEBUG
         logstream(LOG_DEBUG) << "second-order schedule blocks [" << pblk << ", " << cblk << "]" << std::endl;
 #endif
+
+        check_walks_state(walk_manager, pblk, cblk);
 
         _m.start_time("second_order_scheduler_swap_blocks");
         /* increase the cache block life */

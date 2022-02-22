@@ -72,15 +72,25 @@ void second_order_app_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOr
 {
     wtimer.register_entry("walker_update");
     wtimer.register_entry("vertex_sample");
+    wtimer.register_entry("opt_alias_sample_query_neighbors");
+    wtimer.register_entry("opt_alias_sample_select_neighbor");
+    wtimer.register_entry("its_sample_query_neighbors");
+    wtimer.register_entry("its_sample_select_neighbor");
 
+    // #pragma omp parallel for schedule(static)
+    // for (vid_t vertex = 0; vertex < walk_manager->nvertices; vertex++)
+    // {
+    //     wid_t idx = vertex * this->_walkpersource;
+    //     for(wid_t off = 0; off < this->_walkpersource; off++) {
+    //         walker_t<vid_t> walker = walker_makeup<vid_t>(vertex, idx + off, vertex, vertex, this->_hops);
+    //         walk_manager->move_walk(walker);
+    //     }
+    // }
+    vid_t vertex = 10009;
     #pragma omp parallel for schedule(static)
-    for (vid_t vertex = 0; vertex < walk_manager->nvertices; vertex++)
-    {
-        wid_t idx = vertex * this->_walkpersource;
-        for(wid_t off = 0; off < this->_walkpersource; off++) {
-            walker_t<vid_t> walker = walker_makeup<vid_t>(vertex, idx + off, vertex, vertex, this->_hops);
-            walk_manager->move_walk(walker);
-        }
+    for(wid_t off = 0; off < this->_walkpersource; off++) {
+        walker_t<vid_t> walker = walker_makeup<vid_t>(vertex, off, vertex, vertex, this->_hops);
+        walk_manager->move_walk(walker);
     }
 
     for (bid_t blk = 0; blk < total_blocks<SecondOrder>(walk_manager->nblocks); blk++)
@@ -119,7 +129,7 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
         {
             walk_context<SECONDORDERCTX> ctx(param, cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
                                                     seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail);
-            next_vertex = vertex_sample(ctx, sampler);
+            next_vertex = vertex_sample(ctx, sampler, &wtimer);
         }
         else
         {
@@ -128,21 +138,21 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
                 walk_context<BIASEDACCSECONDORDERCTX> ctx(param, cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
                                                           seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail,
                                                           cur_block->acc_weights + adj_head, cur_block->acc_weights + adj_tail, prev_block->acc_weights + prev_adj_head, prev_block->acc_weights + prev_adj_tail, cur_block->prob, cur_block->alias);
-                next_vertex = vertex_sample(ctx, sampler);
+                next_vertex = vertex_sample(ctx, sampler, &wtimer);
             }
             else if (sampler->use_acc_weight)
             {
                 walk_context<BIASEDACCSECONDORDERCTX> ctx(param, cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
                                                           seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail,
                                                           cur_block->acc_weights + adj_head, cur_block->acc_weights + adj_tail, prev_block->acc_weights + prev_adj_head, prev_block->acc_weights + prev_adj_tail);
-                next_vertex = vertex_sample(ctx, sampler);
+                next_vertex = vertex_sample(ctx, sampler, &wtimer);
             }
             else
             {
                 walk_context<BIASEDSECONDORDERCTX> ctx(param, cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
                                                        seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail,
                                                        cur_block->weights + adj_head, cur_block->weights + adj_tail, prev_block->weights + prev_adj_head, prev_block->weights + prev_adj_tail);
-                next_vertex = vertex_sample(ctx, sampler);
+                next_vertex = vertex_sample(ctx, sampler, &wtimer);
             }
         }
         wtimer.stop_time("vertex_sample");

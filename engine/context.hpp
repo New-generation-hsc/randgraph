@@ -194,9 +194,10 @@ public:
     real_t *prev_acc_weight_start, *prev_acc_weight_end;
     real_t *prob;
     vid_t  *alias;
+    real_t gamma_factor, beta_factor, alpha_factor;
 
     walk_context(second_order_param_t param, vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
-                 vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, real_t *acc_wht_start, real_t *acc_wht_end, 
+                 vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, real_t *acc_wht_start, real_t *acc_wht_end,
                  real_t *p_acc_wht_s, real_t *p_acc_wht_e) : context(vertex, num_vertices, start, end, seed)
     {
         this->app_param = param;
@@ -209,6 +210,9 @@ public:
         this->prev_acc_weight_end = p_acc_wht_e;
         this->prob = nullptr;
         this->alias = nullptr;
+        this->gamma_factor = app_param.gamma / app_param.delta;
+        this->beta_factor  = app_param.beta / app_param.delta;
+        this->alpha_factor  = app_param.alpha / app_param.delta;
     }
 
     walk_context(second_order_param_t param, vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
@@ -225,6 +229,9 @@ public:
         this->prev_acc_weight_end = p_acc_wht_e;
         this->prob = pb;
         this->alias = alias_index;
+        this->gamma_factor = app_param.gamma / app_param.delta;
+        this->beta_factor  = app_param.beta / app_param.delta;
+        this->alpha_factor  = app_param.alpha / app_param.delta;
     }
 
     void query_neigbors_weight(std::vector<real_t> &adj_weights) const
@@ -236,7 +243,7 @@ public:
         for(size_t index = 0; index < prev_deg; ++index) neighbor_index[*(prev_adj_start + index)] = index;
 
         for (size_t index = 0; index < deg; ++index)
-        {   
+        {
             if(*(adj_start + index) == prev_vertex) {
                 if (index == 0)
                     adj_weights[index] = (*acc_weight_start) * app_param.gamma;
@@ -269,22 +276,27 @@ public:
     void query_comm_neigbors_weight(std::vector<real_t> &adj_weights, std::vector<vid_t> &comm_neighbors, real_t &total_weight) const
     {
         size_t deg = static_cast<size_t>(adj_end - adj_start);
+        adj_weights.resize(deg);
+        comm_neighbors.resize(deg);
         std::unordered_map<vid_t, size_t> neighbor_index;
         size_t prev_deg = static_cast<size_t>(prev_adj_end - prev_adj_start);
         for(size_t index = 0; index < prev_deg; ++index) neighbor_index[*(prev_adj_start + index)] = index;
 
         real_t comm_weight_sum = 0;
+        size_t off = 0;
         for (size_t index = 0; index < deg; ++index)
-        {   
+        {
             if(*(adj_start + index) == prev_vertex) {
                 real_t cur_w = 0.0;
                 if (index == 0) cur_w = *acc_weight_start;
                 else cur_w = *(acc_weight_start + index) - *(acc_weight_start + index - 1);
-                real_t tmp_wht = (app_param.gamma / app_param.delta - 1.0) * cur_w;
+                real_t tmp_wht = (this->gamma_factor - 1.0) * cur_w;
                 if(tmp_wht > 0.0) {
                     comm_weight_sum += tmp_wht;
-                    adj_weights.push_back(comm_weight_sum);
-                    comm_neighbors.push_back(*(adj_start + index));
+                    // adj_weights.push_back(comm_weight_sum);
+                    // comm_neighbors.push_back(*(adj_start + index));
+                    adj_weights[off] = comm_weight_sum;
+                    comm_neighbors[off++] = *(adj_start + index);
                 }
             }
             else if (neighbor_index.find(*(adj_start + index)) != neighbor_index.end())
@@ -298,13 +310,57 @@ public:
                 else {
                     prev_w = *(prev_acc_weight_start + prev_index) - *(prev_acc_weight_start + prev_index - 1);
                 }
-                comm_weight_sum += app_param.alpha / app_param.delta * prev_w + (app_param.beta / app_param.delta - 1.0) * cur_w;
-                adj_weights.push_back(comm_weight_sum);
-                comm_neighbors.push_back(*(adj_start + index));
+                comm_weight_sum += this->alpha_factor * prev_w + (this->beta_factor - 1.0) * cur_w;
+                // adj_weights.push_back(comm_weight_sum);
+                // comm_neighbors.push_back(*(adj_start + index));
+                adj_weights[off] = comm_weight_sum;
+                comm_neighbors[off++] = *(adj_start + index);
             }
         }
+        adj_weights.resize(off);
+        comm_neighbors.resize(off);
         total_weight = comm_weight_sum + (*(acc_weight_start + (deg - 1)));
     }
+
+//    void query_comm_neigbors_weight(std::vector<real_t> &adj_weights, std::vector<vid_t> &comm_neighbors, real_t &total_weight) const
+//    {
+//        size_t deg = static_cast<size_t>(adj_end - adj_start);
+//        std::unordered_map<vid_t, size_t> neighbor_index;
+//        size_t prev_deg = static_cast<size_t>(prev_adj_end - prev_adj_start);
+//        for(size_t index = 0; index < prev_deg; ++index) neighbor_index[*(prev_adj_start + index)] = index;
+//
+//        real_t comm_weight_sum = 0;
+//        for (size_t index = 0; index < deg; ++index)
+//        {
+//            if(*(adj_start + index) == prev_vertex) {
+//                real_t cur_w = 0.0;
+//                if (index == 0) cur_w = *acc_weight_start;
+//                else cur_w = *(acc_weight_start + index) - *(acc_weight_start + index - 1);
+//                real_t tmp_wht = (this->gamma_factor - 1.0) * cur_w;
+//                if(tmp_wht > 0.0) {
+//                    comm_weight_sum += tmp_wht;
+//                    adj_weights.push_back(comm_weight_sum);
+//                    comm_neighbors.push_back(*(adj_start + index));
+//                }
+//            }
+//            else if (neighbor_index.find(*(adj_start + index)) != neighbor_index.end())
+//            {
+//                real_t prev_w = 0.0, cur_w = 0.0;
+//                if (index == 0) cur_w = *acc_weight_start;
+//                else cur_w = *(acc_weight_start + index) - *(acc_weight_start + index - 1);
+//
+//                size_t prev_index = neighbor_index[*(adj_start + index)];
+//                if (prev_index == 0) prev_w = *prev_acc_weight_start;
+//                else {
+//                    prev_w = *(prev_acc_weight_start + prev_index) - *(prev_acc_weight_start + prev_index - 1);
+//                }
+//                comm_weight_sum += this->alpha_factor * prev_w + (this->beta_factor - 1.0) * cur_w;
+//                adj_weights.push_back(comm_weight_sum);
+//                comm_neighbors.push_back(*(adj_start + index));
+//            }
+//        }
+//        total_weight = comm_weight_sum + (*(acc_weight_start + (deg - 1)));
+//    }
 
     real_t query_pivot_weight(const std::vector<real_t> &adj_weights, const std::vector<vid_t> &comm_neighbors, eid_t pivot) const
     {

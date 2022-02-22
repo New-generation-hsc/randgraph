@@ -80,9 +80,11 @@ int main(int argc, const char *argv[])
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
     scheduler<second_order_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, sampler, m);
+    its_sample_t acc_its_sampler(true);
+    complex_sample_context_t sample_context(sampler, &acc_its_sampler);
 
     engine.prologue(userprogram);
-    engine.run(userprogram, &walk_scheduler, sampler);
+    engine.run(userprogram, &walk_scheduler, &sample_context);
     engine.epilogue(userprogram);
 
     metrics_report(m);

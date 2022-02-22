@@ -18,9 +18,11 @@ sudo sync; sudo sh -c '/usr/bin/echo 1 > /proc/sys/vm/drop_caches'
 
 # the random command
 
-./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample its weighted length 5 walkpersource 1
+# ./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample its weighted length 5 walkpersource 1
 
-# ./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample opt_alias weighted length 5 walkpersource 1
+# ./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample opt_alias weighted length 5 walkpersource 2
+
+./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample opt_alias weighted length 5 walkpersource 2
 
 # ./bin/test/pagerank $DATASET nmblocks $NMBLOCKS sample naive
 
