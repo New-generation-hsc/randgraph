@@ -12,7 +12,6 @@
 #include "walk.hpp"
 #include "util/util.hpp"
 #include "util/io.hpp"
-#include "metrics/metrics.hpp"
 #include "sample.hpp"
 
 template<typename value_t>
@@ -35,151 +34,20 @@ struct walk_scheduler_config_t {
 
 class base_scheduler {
 protected:
-    int vertdesc, edgedesc, degdesc, whtdesc;  /* the beg_pos, csr, degree file descriptor */
-    int prob_desc, alias_desc, acc_wht_desc; /* the alias table descriptor and accumulate weight descriptor */
     metrics &_m;
-    bool _weighted, use_alias, use_acc_weight;
-    bool saved_use_alias;
 
 public:
-    base_scheduler(graph_config *conf, metrics &m) : _m(m)
-    {
-        vertdesc = edgedesc = whtdesc = 0;
-        prob_desc = alias_desc = acc_wht_desc = 0;
-        _weighted = false;
-        use_alias = false;
-        use_acc_weight = false;
-        saved_use_alias = false;
-        this->setup(conf);
-    }
+    base_scheduler(metrics& m) : _m(m) {  }
 
-    base_scheduler(graph_config *conf, sample_t *sampler, metrics& m) : _m(m) {
-        vertdesc = edgedesc = whtdesc = 0;
-        prob_desc = alias_desc = acc_wht_desc = 0;
-        _weighted = false;
-        use_alias = sampler->use_alias;
-        use_acc_weight = sampler->use_acc_weight;
-        saved_use_alias = sampler->use_alias;
-        this->setup(conf);
-    }
-
-    base_scheduler(sample_t *sampler, metrics& m) : _m(m) {
-        vertdesc = edgedesc = whtdesc = 0;
-        prob_desc = alias_desc = acc_wht_desc = 0;
-        _weighted = false;
-        use_alias = sampler->use_alias;
-        use_acc_weight = sampler->use_acc_weight;
-        saved_use_alias = sampler->use_alias;
-    }
-
-    base_scheduler(metrics& m) : _m(m) {
-        vertdesc = edgedesc = whtdesc = 0;
-        prob_desc = alias_desc = acc_wht_desc = 0;
-        _weighted = false;
-        use_alias = false;
-        use_acc_weight = false;
-        saved_use_alias = false;
-    }
-
-    void setup(graph_config *conf) {
-        this->destory();
-
-        std::string beg_pos_name = get_beg_pos_name(conf->base_name, conf->fnum);
-        std::string csr_name = get_csr_name(conf->base_name, conf->fnum);
-        std::string degree_name = get_degree_name(conf->base_name, conf->fnum);
-
-        vertdesc = open(beg_pos_name.c_str(), O_RDONLY);
-        edgedesc = open(csr_name.c_str(), O_RDONLY);
-        degdesc = open(degree_name.c_str(), O_RDONLY);
-        _weighted = conf->is_weighted;
-
-        if (_weighted)
-        {
-            if(use_alias) {
-                std::string prob_name = get_prob_name(conf->base_name, conf->fnum);
-                prob_desc = open(prob_name.c_str(), O_RDONLY);
-                std::string alias_name = get_alias_name(conf->base_name, conf->fnum);
-                alias_desc = open(alias_name.c_str(), O_RDONLY);
-            }
-            if(use_acc_weight) {
-                std::string acc_weight_name = get_accumulate_name(conf->base_name, conf->fnum);
-                acc_wht_desc = open(acc_weight_name.c_str(), O_RDONLY);
-            } else {
-                std::string weight_name = get_weights_name(conf->base_name, conf->fnum);
-                whtdesc = open(weight_name.c_str(), O_RDONLY);
-            }
-        }
-    }
-
-    void load_block_info(graph_cache &cache, graph_driver &driver, graph_block *global_blocks, bid_t cache_index, bid_t block_index)
-    {
-        _m.start_time("load_block_info");
-        cache.cache_blocks[cache_index].block = &global_blocks->blocks[block_index];
-        cache.cache_blocks[cache_index].block->status = ACTIVE;
-        cache.cache_blocks[cache_index].block->cache_index = cache_index;
-
-        cache.cache_blocks[cache_index].beg_pos = (eid_t *)realloc(cache.cache_blocks[cache_index].beg_pos, (global_blocks->blocks[block_index].nverts + 1) * sizeof(eid_t));
-        cache.cache_blocks[cache_index].csr = (vid_t *)realloc(cache.cache_blocks[cache_index].csr, global_blocks->blocks[block_index].nedges * sizeof(vid_t));
-
-        driver.load_block_vertex(vertdesc, cache.cache_blocks[cache_index].beg_pos, global_blocks->blocks[block_index]);
-        driver.load_block_edge(edgedesc, cache.cache_blocks[cache_index].csr, global_blocks->blocks[block_index]);
-        if (_weighted)
-        {
-            if(use_alias) {
-                logstream(LOG_DEBUG) << "load block info alias table for block : " << block_index << std::endl;
-                cache.cache_blocks[cache_index].prob = (real_t *)realloc(cache.cache_blocks[cache_index].prob, global_blocks->blocks[block_index].nedges * sizeof(real_t));
-                driver.load_block_prob(prob_desc, cache.cache_blocks[cache_index].prob, global_blocks->blocks[block_index]);
-                cache.cache_blocks[cache_index].alias = (vid_t*)realloc(cache.cache_blocks[cache_index].alias, global_blocks->blocks[block_index].nedges * sizeof(vid_t));
-                driver.load_block_alias(alias_desc, cache.cache_blocks[cache_index].alias, global_blocks->blocks[block_index]);
-            }
-
-            if(use_acc_weight) {
-                logstream(LOG_DEBUG) << "load block info acc weights  for block : " << block_index << std::endl;
-                cache.cache_blocks[cache_index].prob = (real_t *)realloc(cache.cache_blocks[cache_index].prob, global_blocks->blocks[block_index].nedges * sizeof(real_t));
-                cache.cache_blocks[cache_index].acc_weights = (real_t *)realloc(cache.cache_blocks[cache_index].acc_weights, global_blocks->blocks[block_index].nedges * sizeof(real_t));
-                driver.load_block_weight(acc_wht_desc, cache.cache_blocks[cache_index].acc_weights, global_blocks->blocks[block_index]);
-            } else {
-                logstream(LOG_DEBUG) << "load block info normal weights  for block : " << block_index << std::endl;
-                cache.cache_blocks[cache_index].weights = (real_t *)realloc(cache.cache_blocks[cache_index].weights, global_blocks->blocks[block_index].nedges * sizeof(real_t));
-                driver.load_block_weight(whtdesc, cache.cache_blocks[cache_index].weights, global_blocks->blocks[block_index]);
-            }
-        }
-        _m.stop_time("load_block_info");
-    }
-
-    void destory() {
-        if(vertdesc > 0) close(vertdesc);
-        if(edgedesc > 0) close(edgedesc);
-        if(degdesc > 0) close(degdesc);
-        if(_weighted) {
-            if(use_alias) {
-                close(prob_desc);
-                close(alias_desc);
-            }
-
-            if(use_acc_weight) close(acc_wht_desc);
-            else close(whtdesc);
-        }
-    }
-
-    ~base_scheduler() {
-        this->destory();
-    }
+    ~base_scheduler() {}
 };
 
-template <typename Config>
 class graph_scheduler : public base_scheduler {
 private:
     bid_t exec_blk;                   /* the current cache block index used for run */
     bid_t nrblock;                    /* number of cache blocks are used for running */
 public:
-
-    graph_scheduler(Config& conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {
-        exec_blk = 0;
-        nrblock = 0;
-    }
-
-    graph_scheduler(Config& conf, metrics &m) : base_scheduler(m) {
+    graph_scheduler(metrics &m) : base_scheduler(m) {
         exec_blk = 0;
         nrblock = 0;
     }
@@ -213,7 +81,7 @@ public:
         exec_blk = 0;
 
         for(const auto & p : blocks) {
-            load_block_info(cache, driver, global_blocks, blk, p);
+            driver.load_block_info(cache, global_blocks, blk, p);
             blk++;
         }
 
@@ -245,38 +113,17 @@ public:
     }
 };
 
-template <>
-graph_scheduler<graph_config>::graph_scheduler(graph_config& conf, metrics &m) : base_scheduler(m) {
-    base_scheduler::setup(&conf);
-    exec_blk = 0;
-    nrblock = 0;
-}
-
-template <>
-graph_scheduler<graph_config>::graph_scheduler(graph_config &conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m)
-{
-    base_scheduler::setup(&conf);
-    exec_blk = 0;
-    nrblock = 0;
-}
 
 /**
  * @brief The drunkardmob_scheduler following sequential load blocks
  *
  * @tparam Config
  */
-
-template <typename Config>
 class drunkardmob_scheduler : public base_scheduler {
 private:
     bid_t exec_blk;                   /* the current cache block index used for run */
 public:
-
-    drunkardmob_scheduler(Config& conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {
-        exec_blk = 0;
-    }
-
-    drunkardmob_scheduler(Config& conf, metrics &m) : base_scheduler(m) {
+    drunkardmob_scheduler(metrics &m) : base_scheduler(m) {
         exec_blk = 0;
     }
 
@@ -292,7 +139,7 @@ public:
         }else {
             bid_t new_cache_index = swap_block(cache, walk_manager.global_blocks);
             cache.cache_blocks[new_cache_index].life = 0;
-            load_block_info(cache, driver, walk_manager.global_blocks, new_cache_index, blk);
+            driver.load_block_info(cache, walk_manager.global_blocks, new_cache_index, blk);
         }
         return blk;
     }
@@ -317,12 +164,6 @@ public:
 
     template <typename walk_data_t, WalkType walk_type>
     bid_t choose_blocks(graph_walk<walk_data_t, walk_type> &walk_manager) {
-        // if(exec_blk == walk_manager.global_blocks->nblocks) {
-        //     exec_blk = 0;
-        // }
-        // if(exec_blk == 0) print_walks_distrition(walk_manager);
-        // bid_t ret = exec_blk++;
-        // return ret;
         if(exec_blk == 0) {
             print_walks_distrition(walk_manager);
             exec_blk = walk_manager.global_blocks->nblocks;
@@ -341,36 +182,17 @@ public:
     }
 };
 
-template <>
-drunkardmob_scheduler<graph_config>::drunkardmob_scheduler(graph_config& conf, metrics &m) : base_scheduler(m) {
-    base_scheduler::setup(&conf);
-    exec_blk = 0;
-}
-
-template <>
-drunkardmob_scheduler<graph_config>::drunkardmob_scheduler(graph_config &conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m)
-{
-    base_scheduler::setup(&conf);
-    exec_blk = 0;
-}
 
 /**
  * The following schedule scheme follow the graph walker scheme
  */
-template <typename Config>
 class walk_schedule_t : public base_scheduler
 {
 private:
     float prob;
     bid_t exec_blk;
 public:
-
-    walk_schedule_t(Config& conf, metrics &m) : base_scheduler(m) {
-        prob = 0;
-        exec_blk = 0;
-    }
-
-    walk_schedule_t(Config& conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {
+    walk_schedule_t(metrics &m) : base_scheduler(m) {
         prob = 0;
         exec_blk = 0;
     }
@@ -385,7 +207,7 @@ public:
         _m.start_time("walk_schedule_swap_blocks");
         graph_block *global_blocks = walk_manager.global_blocks;
         exec_blk = swap_block(cache, walk_manager);
-        load_block_info(cache, driver, global_blocks, exec_blk, blk);
+        driver.load_block_info(cache, global_blocks, exec_blk, blk);
         _m.stop_time("walk_schedule_swap_blocks");
         return blk;
     }
@@ -419,20 +241,6 @@ public:
     }
 };
 
-template<>
-walk_schedule_t<walk_scheduler_config_t>::walk_schedule_t(walk_scheduler_config_t& conf, metrics &m) : base_scheduler(m) {
-    base_scheduler::setup(&(conf.conf));
-    prob = conf.p;
-    exec_blk = 0;
-}
-
-template<>
-walk_schedule_t<walk_scheduler_config_t>::walk_schedule_t(walk_scheduler_config_t& conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {
-    base_scheduler::setup(&(conf.conf));
-    prob = conf.p;
-    exec_blk = 0;
-}
-
 template <typename walk_data_t, WalkType walk_type>
 bid_t transform(bid_t pblk, bid_t cblk, graph_walk<walk_data_t, walk_type> &walk_manager)
 {
@@ -449,7 +257,6 @@ bid_t transform<vid_t, SecondOrder>(bid_t pblk, bid_t cblk, graph_walk<vid_t, Se
  * The naive second-order scheduler which follows the graphwalker major constribution
  * In each schedule, load the block that has the most number of walks and processes them
 */
-template<typename Config>
 class navie_graphwalker_scheduler_t : public base_scheduler {
 private:
     std::priority_queue<std::pair<bid_t, wid_t>, std::vector<std::pair<bid_t, wid_t>>, rank_compare<wid_t>> block_queue;
@@ -511,14 +318,13 @@ private:
         bid_t cache_index = (*(walk_manager.global_blocks))[select_block].cache_index;
         if(cache_index == walk_manager.global_blocks->nblocks) {
             cache_index = swap_block(cache, walk_manager, exclude_blk);
-            load_block_info(cache, driver, walk_manager.global_blocks, cache_index, select_block);
+            driver.load_block_info(cache, walk_manager.global_blocks, cache_index, select_block);
         }
         cache.cache_blocks[cache_index].life = 0;
     }
 
 public:
-    navie_graphwalker_scheduler_t(Config& conf, metrics& m) : base_scheduler(m) { }
-    navie_graphwalker_scheduler_t(Config &conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {}
+    navie_graphwalker_scheduler_t(metrics& m) : base_scheduler(m) { }
 
     template <typename walk_data_t, WalkType walk_type>
     bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager) {
@@ -538,22 +344,11 @@ public:
     }
 };
 
-template<>
-navie_graphwalker_scheduler_t<graph_config>::navie_graphwalker_scheduler_t(graph_config &conf, metrics &m) : base_scheduler(m) {
-    setup(&conf);
-}
-
-template<>
-navie_graphwalker_scheduler_t<graph_config>::navie_graphwalker_scheduler_t(graph_config &conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {
-    setup(&conf);
-}
-
 
 /**
  * The following scheduler is the second-order scheduler
  * the scheduler selects two block each time and check whether they are already in memory or not
 */
-template<typename Config>
 class second_order_scheduler_t : public base_scheduler {
 private:
     template <typename walk_data_t, WalkType walk_type>
@@ -593,22 +388,8 @@ private:
         return blk;
     }
 
-    template<typename walk_data_t, WalkType walk_type>
-    void check_walks_state(graph_walk<walk_data_t, walk_type> &walk_manager, bid_t pblk, bid_t cblk) {
-        bid_t select_block = pblk * walk_manager.global_blocks->nblocks + cblk;
-        wid_t nwalks = walk_manager.nblockwalks(select_block);
-        block_t &block_info = (*(walk_manager.global_blocks))[cblk];
-        vid_t nverts = block_info.nverts;
-        if((double)nwalks < 0.8 * nverts) {
-            if(saved_use_alias) use_alias = false;
-        } else {
-            if(saved_use_alias) use_alias = true;
-        }
-    }
-
 public:
-    second_order_scheduler_t(Config& conf, metrics& m) : base_scheduler(m) { }
-    second_order_scheduler_t(Config &conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {}
+    second_order_scheduler_t(metrics& m) : base_scheduler(m) { }
 
     template <typename walk_data_t, WalkType walk_type>
     bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager) {
@@ -619,8 +400,6 @@ public:
         logstream(LOG_DEBUG) << "second-order schedule blocks [" << pblk << ", " << cblk << "]" << std::endl;
 #endif
 
-        check_walks_state(walk_manager, pblk, cblk);
-
         _m.start_time("second_order_scheduler_swap_blocks");
         /* increase the cache block life */
         for(bid_t p = 0; p < cache.ncblock; ++p) cache.cache_blocks[p].life++;
@@ -630,7 +409,7 @@ public:
         }else {
             p_cache_index = swap_block(cache, walk_manager, walk_manager.global_blocks->nblocks);
             cache.cache_blocks[p_cache_index].life = 0;
-            load_block_info(cache, driver, walk_manager.global_blocks, p_cache_index, pblk);
+            driver.load_block_info(cache, walk_manager.global_blocks, p_cache_index, pblk);
         }
 
         bid_t cache_index = (*(walk_manager.global_blocks))[cblk].cache_index;
@@ -639,29 +418,18 @@ public:
         }else {
             cache_index = swap_block(cache, walk_manager, p_cache_index);
             cache.cache_blocks[cache_index].life = 0;
-            load_block_info(cache, driver, walk_manager.global_blocks, cache_index, cblk);
+            driver.load_block_info(cache, walk_manager.global_blocks, cache_index, cblk);
         }
         _m.stop_time("second_order_scheduler_swap_blocks");
         return transform<walk_data_t, walk_type>(pblk, cblk, walk_manager);
     }
 };
 
-template<>
-second_order_scheduler_t<graph_config>::second_order_scheduler_t(graph_config& conf, metrics &m) : base_scheduler(m) {
-    setup(&conf);
-}
 
-template<>
-second_order_scheduler_t<graph_config>::second_order_scheduler_t(graph_config& conf, sample_t *sampler, metrics &m) : base_scheduler(sampler, m) {
-    setup(&conf);
-}
-
-
-template<typename BaseType, typename Config>
+template<typename BaseType>
 class scheduler : public BaseType {
 public:
-    scheduler(Config &conf, metrics &m) : BaseType(conf, m) { }
-    scheduler(Config &conf, sample_t *sampler, metrics &m) : BaseType(conf, sampler, m) {}
+    scheduler(metrics &m) : BaseType(m) { }
 
     template <typename walk_data_t, WalkType walk_type>
     bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager) {

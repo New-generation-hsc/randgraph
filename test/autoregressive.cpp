@@ -39,8 +39,8 @@ int main(int argc, const char *argv[])
     };
 
     graph_block blocks(&conf);
-    graph_driver driver;
     metrics m("autoregressive");
+    graph_driver driver(&conf, m);
 
     graph_walk<vid_t, SecondOrder> walk_mangager(conf.base_name, conf.nvertices, conf.nthreads, driver, blocks);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
@@ -79,7 +79,7 @@ int main(int argc, const char *argv[])
 
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
-    scheduler<second_order_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, sampler, m);
+    scheduler<second_order_scheduler_t> walk_scheduler(m);
     its_sample_t acc_its_sampler(true);
     complex_sample_context_t sample_context(sampler, &acc_its_sampler);
 

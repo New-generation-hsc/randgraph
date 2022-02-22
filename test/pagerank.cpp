@@ -37,8 +37,8 @@ int main(int argc, const char* argv[]) {
     };
 
     graph_block blocks(&conf);
-    graph_driver driver;
     metrics m("pagerank");
+    graph_driver driver(&conf, m);
 
     graph_walk<empty_data_t, FirstOrder> walk_mangager(conf.base_name, conf.nvertices, conf.nthreads, driver, blocks);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
@@ -69,7 +69,7 @@ int main(int argc, const char* argv[]) {
 
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
-    scheduler<drunkardmob_scheduler<graph_config>, graph_config> walk_scheduler(conf, sampler, m);
+    scheduler<drunkardmob_scheduler> walk_scheduler(m);
     // scheduler<graph_scheduler<graph_config>, graph_config> graph_scheduler(conf, m);
     naive_sample_context_t sample_context(sampler);
 

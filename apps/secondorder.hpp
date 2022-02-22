@@ -77,21 +77,21 @@ void second_order_app_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOr
     wtimer.register_entry("its_sample_query_neighbors");
     wtimer.register_entry("its_sample_select_neighbor");
 
-    // #pragma omp parallel for schedule(static)
-    // for (vid_t vertex = 0; vertex < walk_manager->nvertices; vertex++)
-    // {
-    //     wid_t idx = vertex * this->_walkpersource;
-    //     for(wid_t off = 0; off < this->_walkpersource; off++) {
-    //         walker_t<vid_t> walker = walker_makeup<vid_t>(vertex, idx + off, vertex, vertex, this->_hops);
-    //         walk_manager->move_walk(walker);
-    //     }
-    // }
-    vid_t vertex = 10009;
     #pragma omp parallel for schedule(static)
-    for(wid_t off = 0; off < this->_walkpersource; off++) {
-        walker_t<vid_t> walker = walker_makeup<vid_t>(vertex, off, vertex, vertex, this->_hops);
-        walk_manager->move_walk(walker);
+    for (vid_t vertex = 0; vertex < walk_manager->nvertices; vertex++)
+    {
+        wid_t idx = vertex * this->_walkpersource;
+        for(wid_t off = 0; off < this->_walkpersource; off++) {
+            walker_t<vid_t> walker = walker_makeup<vid_t>(vertex, idx + off, vertex, vertex, this->_hops);
+            walk_manager->move_walk(walker);
+        }
     }
+    // vid_t vertex = 10009;
+    // #pragma omp parallel for schedule(static)
+    // for(wid_t off = 0; off < this->_walkpersource; off++) {
+    //     walker_t<vid_t> walker = walker_makeup<vid_t>(vertex, off, vertex, vertex, this->_hops);
+    //     walk_manager->move_walk(walker);
+    // }
 
     for (bid_t blk = 0; blk < total_blocks<SecondOrder>(walk_manager->nblocks); blk++)
     {

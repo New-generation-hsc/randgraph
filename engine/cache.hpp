@@ -19,7 +19,7 @@
  */
 
 /** block has four state
- * 
+ *
  * `USING`      : the block is running
  * `USED`       : the block is finished runing, but still in memory
  * `ACTIVE`     : the block is in memroy, but not use
@@ -66,20 +66,22 @@ class cache_block {
 public:
     block_t *block;
 
-    eid_t *beg_pos;                 
+    eid_t *beg_pos;
     vid_t *degree;
     vid_t *csr;
     real_t *weights;
-    
+
     /* the following two field just for alias table sample method */
     real_t *prob;
     vid_t  *alias;
     real_t *acc_weights;
 
+    bool loaded_alias;
+
     /**
      * record each block life, when swap out, the largest life block will be evicted
      */
-    int life; 
+    int life;
 
     cache_block() {
         block   = NULL;
@@ -91,6 +93,7 @@ public:
         alias   = NULL;
         acc_weights = NULL;
         life = 0;
+        loaded_alias = false;
     }
 
     ~cache_block() {
@@ -134,7 +137,7 @@ public:
         nblocks = vblocks.size() - 1;
         blocks.resize(nblocks);
 
-        for(bid_t blk = 0; blk < nblocks; blk++) { 
+        for(bid_t blk = 0; blk < nblocks; blk++) {
             blocks[blk].blk = blk;
             blocks[blk].cache_index = nblocks;
             blocks[blk].start_vert = vblocks[blk];
@@ -167,7 +170,7 @@ public:
 
     bid_t get_block(vid_t v) {
         bid_t blk = 0;
-        for(; blk < nblocks; blk++) { 
+        for(; blk < nblocks; blk++) {
             if(v < blocks[blk].start_vert + blocks[blk].nverts) return blk;
         }
         return nblocks;
@@ -180,7 +183,7 @@ public:
     bid_t ncblock;                  /* number of cache blocks */
     std::vector<cache_block> cache_blocks; /* the cached blocks */
 
-    graph_cache(bid_t nblocks, size_t blocksize = BLOCK_SIZE) { 
+    graph_cache(bid_t nblocks, size_t blocksize = BLOCK_SIZE) {
         setup(nblocks, blocksize);
     }
 

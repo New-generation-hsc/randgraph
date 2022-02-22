@@ -39,8 +39,8 @@ int main(int argc, const char *argv[])
     };
 
     graph_block blocks(&conf);
-    graph_driver driver;
     metrics m("node2vec");
+    graph_driver driver(&conf, m);
 
     graph_walk<vid_t, SecondOrder> walk_mangager(conf.base_name, conf.nvertices, conf.nthreads, driver, blocks);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
@@ -55,13 +55,11 @@ int main(int argc, const char *argv[])
     userprogram_t<second_order_app_t, second_order_conf_t> userprogram(app_conf);
     graph_engine<vid_t, SecondOrder> engine(cache, walk_mangager, driver, conf, m);
 
-    naive_sample_t naive_sampler;
-    its_sample_t its_sampler;
-    alias_sample_t alias_sampler;
-    reject_sample_t reject_sampler;
+    its_sample_t its_sampler(true);
+    alias_sample_t alias_sampler(true);
+    reject_sample_t reject_sampler(true);
     second_order_soopt_sample_t soopt_sampler;
     second_order_opt_alias_sample_t opt_alias_sampler;
-    its_sample_t acc_its_sampler(true);
 
     // scheduler *scheduler = nullptr;
     sample_policy_t *sampler = nullptr;
@@ -76,15 +74,13 @@ int main(int argc, const char *argv[])
         sampler = &soopt_sampler;
     else if(type == "opt_alias")
         sampler = &opt_alias_sampler;
-    else if(type == "acc_its")
-        sampler = &acc_its_sampler;
     else
         sampler = &its_sampler;
 
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
-    scheduler<second_order_scheduler_t<graph_config>, graph_config> walk_scheduler(conf, sampler, m);
-    complex_sample_context_t sample_context(sampler, &acc_its_sampler);
+    scheduler<second_order_scheduler_t> walk_scheduler(m);
+    complex_sample_context_t sample_context(sampler, &its_sampler);
     // naive_sample_context_t sample_context(sampler);
 
     engine.prologue(userprogram);

@@ -313,4 +313,132 @@ wid_t graph_walk<vid_t, SecondOrder>::block_active_walks(bid_t blk) {
     return walks_cnt;
 }
 
+struct block_walk_state_t {
+    wid_t num_mem_walks, num_disk_walks, disk_load_walks;
+};
+
+template<WalkType walk_type>
+struct block_walks_impl_t {
+    bool has_finished() const { return false; }
+    template<typename walk_data_t>
+    size_t query_block_state(graph_walk<walk_data_t, walk_type> &walk_manager, graph_cache &cache, bid_t exec_block) {
+        return 0;
+    }
+    template<typename walk_data_t>
+    size_t load_walks(graph_walk<walk_data_t, walk_type> &walk_manager, bid_t exec_block) {
+        return 0;
+    }
+};
+
+template<>
+struct block_walks_impl_t<FirstOrder> {
+    block_walk_state_t state;
+
+    block_walks_impl_t() {  }
+    bool has_finished() const {
+        return state.num_mem_walks == 0 && state.num_disk_walks == 0;
+    }
+
+    template<typename walk_data_t>
+    size_t query_block_state(graph_walk<walk_data_t, FirstOrder> &walk_manager, graph_cache &cache, bid_t exec_block) {
+        state.num_mem_walks = walk_manager.nmwalks(exec_block);
+        state.num_disk_walks = walk_manager.ndwalks(exec_block);
+        state.disk_load_walks = 0;
+        return state.num_mem_walks + state.num_disk_walks;
+    }
+
+    template<typename walk_data_t>
+    size_t load_walks(graph_walk<walk_data_t, FirstOrder> &walk_manager, bid_t exec_block) {
+        size_t nwalks = 0;
+        if(state.num_mem_walks > 0) {
+            nwalks = walk_manager.load_memory_walks(exec_block);
+            state.num_mem_walks = 0;
+        } else if(state.num_disk_walks > 0) {
+            wid_t interval_max_walks = 32 * MAX_TWALKS;
+            wid_t interval_walks = std::min(state.num_disk_walks, interval_max_walks);
+            state.num_disk_walks -= interval_walks;
+            nwalks = walk_manager.load_disk_walks(exec_block, interval_walks, state.disk_load_walks);
+            state.disk_load_walks += interval_walks;
+        }
+
+        if(state.num_disk_walks == 0) {
+            walk_manager.dump_walks(exec_block);
+        }
+        return nwalks;
+    }
+};
+
+template<>
+struct block_walks_impl_t<SecondOrder> {
+    std::vector<bid_t> active_cache_blocks;
+    block_walk_state_t state;
+    size_t idx;
+    bool queried;
+
+    block_walks_impl_t() {
+        state.num_mem_walks = state.num_disk_walks = state.disk_load_walks = 0;
+        idx = 0;
+        queried = false;
+    }
+
+    bool has_finished() const {
+        return idx >= active_cache_blocks.size();
+    }
+
+    template<typename walk_data_t>
+    size_t query_block_state(graph_walk<walk_data_t, SecondOrder> &walk_manager, graph_cache &cache, bid_t exec_block) {
+        // the total_walks is just an approximate value
+        bid_t nblocks = walk_manager.global_blocks->nblocks;
+        size_t total_walks = 0;
+        for(bid_t index = 0; index < cache.ncblock; index++) {
+            if(cache.cache_blocks[index].block != NULL) {
+               bid_t blk = cache.cache_blocks[index].block->blk;
+               wid_t walk_cnt = walk_manager.nblockwalks(blk * nblocks + exec_block);
+               if(walk_cnt > 0) {
+                   active_cache_blocks.push_back(blk);
+                   total_walks += walk_cnt;
+               }
+            }
+        }
+        return total_walks;
+    }
+
+    template<typename walk_data_t>
+    void query_interval_block_state(graph_walk<walk_data_t, SecondOrder> &walk_manager, bid_t select_block) {
+        state.num_mem_walks = walk_manager.nmwalks(select_block);
+        state.num_disk_walks = walk_manager.ndwalks(select_block);
+        state.disk_load_walks = 0;
+        queried = true;
+    }
+
+    template<typename walk_data_t>
+    size_t load_walks(graph_walk<walk_data_t, SecondOrder> &walk_manager, bid_t exec_block) {
+        size_t nwalks = 0;
+        bid_t select_block = active_cache_blocks[idx] * walk_manager.global_blocks->nblocks + exec_block;
+        if(!queried) {
+            query_interval_block_state(walk_manager, select_block);
+        }
+
+        if(state.num_mem_walks > 0) {
+            nwalks = walk_manager.load_memory_walks(select_block);
+            state.num_mem_walks = 0;
+            logstream(LOG_DEBUG) << "load memory walks from " << active_cache_blocks[idx] << " to " << exec_block << ", walks = " << nwalks << std::endl;
+        } else if(state.num_disk_walks > 0) {
+            wid_t interval_max_walks = 32 * MAX_TWALKS;
+            wid_t interval_walks = std::min(state.num_disk_walks, interval_max_walks);
+            state.num_disk_walks -= interval_walks;
+            nwalks = walk_manager.load_disk_walks(select_block, interval_walks, state.disk_load_walks);
+            state.disk_load_walks += interval_walks;
+            logstream(LOG_DEBUG) << "load disk walks from " << active_cache_blocks[idx] << " to " << exec_block << ", walks = " << nwalks << std::endl;
+        }
+
+        if(state.num_disk_walks == 0) {
+            walk_manager.dump_walks(select_block);
+            idx++;
+            queried = false;
+        }
+        return nwalks;
+    }
+};
+
 #endif

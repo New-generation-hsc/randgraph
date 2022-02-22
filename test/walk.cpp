@@ -37,8 +37,8 @@ int main(int argc, const char* argv[]) {
     };
 
     graph_block blocks(&conf);
-    graph_driver driver;
     metrics m("randomwalk");
+    graph_driver driver(&conf, m);
 
     graph_walk<empty_data_t, FirstOrder> walk_mangager(conf.base_name, conf.nvertices, conf.nthreads, driver, blocks);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
@@ -66,7 +66,7 @@ int main(int argc, const char* argv[]) {
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
     walk_scheduler_config_t walk_config = { conf, 0.2 };
-    scheduler<walk_schedule_t<walk_scheduler_config_t>, walk_scheduler_config_t> walk_scheduler(walk_config, sampler, m);
+    scheduler<walk_schedule_t> walk_scheduler(m);
     // scheduler<graph_scheduler<graph_config>, graph_config> graph_scheduler(conf, m);
     naive_sample_context_t sample_context(sampler);
 
