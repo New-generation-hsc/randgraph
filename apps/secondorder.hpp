@@ -103,12 +103,10 @@ void second_order_app_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOr
 template <>
 void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &walker, graph_cache *cache, graph_walk<vid_t, SecondOrder> *walk_manager, sample_policy_t *sampler, unsigned int *seed)
 {
-    // tid_t tid = (tid_t)omp_get_thread_num();
     vid_t cur_vertex = WALKER_POS(walker), prev_vertex = get_vertex_from_walk(walker.data);
     hid_t hop = WALKER_HOP(walker);
     bid_t cur_blk = walk_manager->global_blocks->get_block(cur_vertex);
     bid_t prev_blk = walk_manager->global_blocks->get_block(prev_vertex);
-    // unsigned seed = (unsigned)(cur_vertex + prev_vertex + hop + tid + time(NULL));
     bid_t cur_cache_index = (*(walk_manager->global_blocks))[cur_blk].cache_index, prev_cache_index = (*(walk_manager->global_blocks))[prev_blk].cache_index;
     bid_t nblocks = walk_manager->global_blocks->nblocks;
     assert(cur_cache_index != nblocks && prev_cache_index != nblocks);
@@ -161,12 +159,13 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
         cur_vertex = next_vertex;
 
         prev_cache_index = cur_cache_index;
+        hop--;
+
         if (!(cur_vertex >= cur_block->block->start_vert && cur_vertex < cur_block->block->start_vert + cur_block->block->nverts))
         {
-            cur_blk = walk_manager->global_blocks->get_block(cur_vertex);
-            cur_cache_index = (*(walk_manager->global_blocks))[cur_blk].cache_index;
+            // walk to other partition
+            break;
         }
-        hop--;
     }
     wtimer.stop_time("walker_update");
 

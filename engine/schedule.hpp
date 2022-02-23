@@ -259,7 +259,7 @@ bid_t transform<vid_t, SecondOrder>(bid_t pblk, bid_t cblk, graph_walk<vid_t, Se
  * The naive second-order scheduler which follows the graphwalker major constribution
  * In each schedule, load the block that has the most number of walks and processes them
 */
-class navie_graphwalker_scheduler_t : public base_scheduler {
+class naive_graphwalker_scheduler_t : public base_scheduler {
 private:
     std::priority_queue<std::pair<bid_t, wid_t>, std::vector<std::pair<bid_t, wid_t>>, rank_compare<wid_t>> block_queue;
     bid_t exec_blk;
@@ -326,7 +326,7 @@ private:
     }
 
 public:
-    navie_graphwalker_scheduler_t(metrics& m) : base_scheduler(m) { }
+    naive_graphwalker_scheduler_t(metrics& m) : base_scheduler(m) { }
 
     template <typename walk_data_t, WalkType walk_type>
     bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager) {

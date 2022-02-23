@@ -51,9 +51,41 @@ public:
         logstream(LOG_INFO) << "Random walks start executing, please wait for a minute." << std::endl;
         gtimer.start_time();
         int run_count = 0;
+        bid_t nblocks = walk_manager->global_blocks->nblocks, cur_block = nblocks;
+        sample_policy_t *sampler = nullptr;
+        wid_t nwalks = 0, interval_max_walks = conf->nthreads * MAX_TWALKS;
         while(!walk_manager->test_finished_walks()) {
             bid_t select_block = block_scheduler->schedule(*cache, *driver, *walk_manager);
-            exec_block(userprogram, select_block, sampler_context, run_count);
+            if(select_block % nblocks != cur_block) {
+                cur_block = select_block % nblocks;
+                wid_t approximate_walks = 0;
+                for(bid_t blk = 0; blk < nblocks; blk++) approximate_walks += walk_manager->nblockwalks(blk * nblocks + cur_block);
+                wid_t total_walks = walk_manager->nwalks();
+
+                bid_t cache_index = (*(walk_manager->global_blocks))[cur_block].cache_index;
+                cache_block *run_block  = &cache->cache_blocks[cache_index];
+                sampler = sampler_context->sample_switch(run_block, approximate_walks, total_walks);
+
+                logstream(LOG_DEBUG) << "run time : " << gtimer.runtime() << ", run block =  " << cur_block << ", approximate walks = " << approximate_walks  << std::endl;
+                logstream(LOG_DEBUG) << "nverts = " << run_block->block->nverts << ", nedges = " << run_block->block->nedges << ", walk density = " << (real_t)approximate_walks / run_block->block->nverts << ", sampler : " << sampler->sample_name() << std::endl;
+                logstream(LOG_DEBUG) << "run_count = " << run_count << ", total walks = " << total_walks << std::endl;
+
+                driver->load_extra_meta(*cache, walk_manager->global_blocks, cache_index, cur_block, sampler->use_alias);
+            }
+
+            wid_t num_disk_walks = walk_manager->ndwalks(select_block), disk_load_walks = 0;
+            nwalks = walk_manager->load_memory_walks(select_block);
+            logstream(LOG_DEBUG) << "load memory walks from " << select_block / nblocks << " to " << cur_block << ", walks = " << nwalks << std::endl;
+            update_walk(userprogram, nwalks, sampler);
+            while(num_disk_walks > 0) {
+                wid_t interval_walks = std::min(num_disk_walks, interval_max_walks);
+                num_disk_walks -= interval_walks;
+                nwalks = walk_manager->load_disk_walks(select_block, interval_walks, disk_load_walks);
+                disk_load_walks += interval_walks;
+                logstream(LOG_DEBUG) << "load disk walks from " << select_block / nblocks << " to " << cur_block << ", walks = " << nwalks << std::endl;
+                update_walk(userprogram, nwalks, sampler);
+            }
+            walk_manager->dump_walks(select_block);
             run_count++;
         }
         logstream(LOG_DEBUG) << gtimer.runtime() << "s, total run count : " << run_count << std::endl;
@@ -80,26 +112,6 @@ public:
             }
         }
         _m.stop_time("exec_block_walk");
-    }
-
-    template <typename AppType, typename AppConfig>
-    void exec_block(userprogram_t<AppType, AppConfig> &userprogram, bid_t exec_block, sample_context_t *sampler_context, int run_count) {
-        block_walks_impl_t<walk_type> block_state;
-        wid_t approximate_walks = block_state.query_block_state(*walk_manager, *cache, exec_block);
-        wid_t total_walks = walk_manager->nwalks();
-        bid_t cache_index = (*(walk_manager->global_blocks))[exec_block].cache_index;
-        cache_block *run_block  = &cache->cache_blocks[cache_index];
-        sample_policy_t *sampler = sampler_context->sample_switch(run_block, approximate_walks, total_walks);
-
-        logstream(LOG_DEBUG) << "run time : " << gtimer.runtime() << ", run block =  " << exec_block << ", approximate walks = " << approximate_walks  << std::endl;
-        logstream(LOG_DEBUG) << "nverts = " << run_block->block->nverts << ", nedges = " << run_block->block->nedges << ", walk density = " << (real_t)approximate_walks / run_block->block->nverts << ", sampler : " << sampler->sample_name() << std::endl;
-        logstream(LOG_DEBUG) << "run_count = " << run_count << ", total walks = " << total_walks << std::endl;
-
-        driver->load_extra_meta(*cache, walk_manager->global_blocks, cache_index, exec_block, sampler->use_alias);
-        while(!block_state.has_finished()) {
-            wid_t nwalks = block_state.load_walks(*walk_manager, exec_block);
-            update_walk(userprogram, nwalks, sampler);
-        }
     }
 };
 
