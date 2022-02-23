@@ -546,10 +546,12 @@ public:
         if(randval < ctx.prob[rand_pos]) target_vertex = *(ctx.adj_start + rand_pos);
         else if(randval < old_weights) target_vertex = *(ctx.adj_start + ctx.alias[rand_pos]);
         else {
+            wtimer->start_time("opt_alias_its_sample_select_neighbor");
             assert(adj_weights.size() > 0);
             randval = static_cast<real_t>(rand_r(ctx.local_seed)) / static_cast<real_t>(RAND_MAX) * adj_weights.back();
             size_t pos = std::upper_bound(adj_weights.begin(), adj_weights.end(), randval) - adj_weights.begin();
             target_vertex = comm_neighbors[pos];
+            wtimer->stop_time("opt_alias_its_sample_select_neighbor");
         }
         wtimer->stop_time("opt_alias_sample_select_neighbor");
         return target_vertex;
