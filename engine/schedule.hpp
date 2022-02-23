@@ -1,10 +1,12 @@
 #ifndef _GRAPH_SCHEDULE_H_
 #define _GRAPH_SCHEDULE_H_
 
+#include <limits>
 #include <string>
 #include <algorithm>
 #include <utility>
 #include <queue>
+#include <numeric>
 
 #include "cache.hpp"
 #include "config.hpp"
@@ -351,59 +353,39 @@ public:
 */
 class second_order_scheduler_t : public base_scheduler {
 private:
+    bid_t first_block, second_block;
+
     template <typename walk_data_t, WalkType walk_type>
-    std::pair<bid_t, bid_t> choose_blocks(graph_cache &cache, graph_walk<walk_data_t, walk_type> &walk_manager) {
-        return { 0, 0 };
-    }
+    void choose_blocks(graph_cache &cache, graph_walk<walk_data_t, walk_type> &walk_manager) {  }
 
-    std::pair<bid_t, bid_t> choose_blocks(graph_cache &cache, graph_walk<vid_t, SecondOrder> &walk_manager)
+    wid_t choose_blocks(graph_cache &cache, graph_walk<vid_t, SecondOrder> &walk_manager)
     {
-        // a much easy implementation
         bid_t nblocks = walk_manager.global_blocks->nblocks;
-        std::pair<bid_t, bid_t> ans;
-        bid_t candidate_block = 0;
         wid_t nwalks = 0;
-        for(bid_t blk = 0; blk < walk_manager.global_blocks->nblocks; blk++) {
-            wid_t walk_cnt = 0;
-            for(bid_t index = 0; index < cache.ncblock; index++) {
-                if(cache.cache_blocks[index].block != NULL) {
-                    bid_t cblk = cache.cache_blocks[index].block->blk;
-                    walk_cnt += walk_manager.nblockwalks(cblk * nblocks + blk);
-                    if(blk != cblk) {
-                        walk_cnt += walk_manager.nblockwalks(blk * nblocks + cblk);
+        for(bid_t blk = 0; blk < nblocks; blk++) {
+            for(bid_t sblk = blk; sblk < nblocks; sblk++) {
+                wid_t walk_cnt = 0;
+                for(bid_t index = 0; index < cache.ncblock; index++) {
+                    if(cache.cache_blocks[index].block != NULL) {
+                        bid_t cblk = cache.cache_blocks[index].block->blk;
+                        if(cblk == blk || cblk == sblk) continue;
+                        walk_cnt += walk_manager.nblockwalks(cblk * nblocks + blk);
+                        walk_cnt += walk_manager.nblockwalks(cblk * nblocks + sblk);
                     }
                 }
-            }
-            if(walk_cnt > nwalks) {
-                candidate_block = blk;
-                nwalks = walk_cnt;
-            }
-        }
 
-        ans.first = candidate_block;
-        nwalks = 0;
+                walk_cnt += walk_manager.nblockwalks(blk * nblocks + sblk) + walk_manager.nblockwalks(blk * nblocks + blk);
+                if(sblk != blk) {
+                    walk_cnt += walk_manager.nblockwalks(sblk * nblocks + blk) + walk_manager.nblockwalks(sblk * nblocks + sblk);
+                }
 
-        for(bid_t blk = 0; blk < walk_manager.global_blocks->nblocks; blk++) {
-            if(blk == ans.first) continue;
-            wid_t walk_cnt = 0;
-            for(bid_t index = 0; index < cache.ncblock; index++) {
-                if(cache.cache_blocks[index].block != NULL) {
-                    bid_t cblk = cache.cache_blocks[index].block->blk;
-                    walk_cnt += walk_manager.nblockwalks(cblk * nblocks + blk);
-                    if(blk != cblk) {
-                        walk_cnt += walk_manager.nblockwalks(blk * nblocks + cblk);
-                    }
+                if(walk_cnt > nwalks) {
+                    nwalks = walk_cnt;
+                    first_block = blk, second_block = sblk;
                 }
             }
-            walk_cnt += walk_manager.nblockwalks(blk * nblocks + ans.first);
-            walk_cnt += walk_manager.nblockwalks(ans.first * nblocks + blk);
-            if(walk_cnt > nwalks) {
-                candidate_block = blk;
-                nwalks = walk_cnt;
-            }
         }
-        ans.second = candidate_block;
-        return ans;
+        return nwalks;
     }
 
     template<typename walk_data_t, WalkType walk_type>
@@ -432,43 +414,205 @@ private:
     }
 
 public:
-    second_order_scheduler_t(metrics& m) : base_scheduler(m) { }
+    second_order_scheduler_t(metrics& m) : base_scheduler(m) {
+        first_block = std::numeric_limits<bid_t>::max();
+        second_block = std::numeric_limits<bid_t>::max();
+    }
 
     template <typename walk_data_t, WalkType walk_type>
     bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager) {
-        std::pair<bid_t, bid_t> select_blocks = choose_blocks(cache, walk_manager);
-        bid_t pblk = select_blocks.first, cblk = select_blocks.second;
+        if(second_block != std::numeric_limits<bid_t>::max()) {
+            bid_t ret = second_block;
+            second_block = std::numeric_limits<bid_t>::max();
+            return ret;
+        }
+
+        choose_blocks(cache, walk_manager);
 
 #ifdef TESTDEBUG
-        logstream(LOG_DEBUG) << "second-order schedule blocks [" << pblk << ", " << cblk << "]" << std::endl;
+        logstream(LOG_DEBUG) << "second-order schedule blocks [" << first_block << ", " << second_block << "]" << std::endl;
 #endif
 
         _m.start_time("second_order_scheduler_swap_blocks");
         /* increase the cache block life */
         for(bid_t p = 0; p < cache.ncblock; ++p) cache.cache_blocks[p].life++;
-        bid_t p_cache_index = (*(walk_manager.global_blocks))[pblk].cache_index;
+        bid_t p_cache_index = (*(walk_manager.global_blocks))[first_block].cache_index;
         if(p_cache_index != walk_manager.global_blocks->nblocks) {
             cache.cache_blocks[p_cache_index].life = 0;
         }else {
             p_cache_index = swap_block(cache, walk_manager, walk_manager.global_blocks->nblocks);
             cache.cache_blocks[p_cache_index].life = 0;
-            driver.load_block_info(cache, walk_manager.global_blocks, p_cache_index, pblk);
+            driver.load_block_info(cache, walk_manager.global_blocks, p_cache_index, first_block);
         }
 
-        bid_t cache_index = (*(walk_manager.global_blocks))[cblk].cache_index;
+        bid_t cache_index = (*(walk_manager.global_blocks))[second_block].cache_index;
         if(cache_index != walk_manager.global_blocks->nblocks) {
             cache.cache_blocks[cache_index].life = 0;
         }else {
             cache_index = swap_block(cache, walk_manager, p_cache_index);
             cache.cache_blocks[cache_index].life = 0;
-            driver.load_block_info(cache, walk_manager.global_blocks, cache_index, cblk);
+            driver.load_block_info(cache, walk_manager.global_blocks, cache_index, second_block);
         }
         _m.stop_time("second_order_scheduler_swap_blocks");
-        return transform<walk_data_t, walk_type>(pblk, cblk, walk_manager);
+        bid_t ret = first_block;
+        first_block = std::numeric_limits<bid_t>::max();
+        return ret;
     }
 };
 
 
+/**
+ * The following scheduler is the surfer scheduler
+ * the scheduler selects one block at first, if the total walks is less than 1000, then choose two blocks
+*/
+class surfer_scheduler_t: public base_scheduler {
+private:
+    bid_t first_block, second_block;
+
+    template <typename walk_data_t, WalkType walk_type>
+    void choose_blocks(graph_cache &cache, graph_walk<walk_data_t, walk_type> &walk_manager) {  }
+
+    wid_t choose_single_blocks(graph_cache &cache, graph_walk<vid_t, SecondOrder> &walk_manager)
+    {
+        bid_t nblocks = walk_manager.global_blocks->nblocks;
+        wid_t nwalks = 0;
+        for(bid_t blk = 0; blk < nblocks; blk++) {
+            wid_t walk_cnt = 0;
+            for(bid_t index = 0; index < cache.ncblock; index++) {
+                if(cache.cache_blocks[index].block != NULL) {
+                    bid_t cblk = cache.cache_blocks[index].block->blk;
+                    if(cblk == blk) continue;
+                    walk_cnt += walk_manager.nblockwalks(cblk * nblocks + blk);
+                }
+            }
+
+            walk_cnt += walk_manager.nblockwalks(blk * nblocks + blk);
+            if(walk_cnt > nwalks) {
+                nwalks = walk_cnt;
+                first_block = blk;
+            }
+        }
+        second_block = std::numeric_limits<bid_t>::max();
+        return nwalks;
+    }
+
+    wid_t choose_double_blocks(graph_cache &cache, graph_walk<vid_t, SecondOrder> &walk_manager)
+    {
+        bid_t nblocks = walk_manager.global_blocks->nblocks;
+        wid_t nwalks = 0;
+        for(bid_t blk = 0; blk < nblocks; blk++) {
+            for(bid_t sblk = blk; sblk < nblocks; sblk++) {
+                wid_t walk_cnt = 0;
+                for(bid_t index = 0; index < cache.ncblock; index++) {
+                    if(cache.cache_blocks[index].block != NULL) {
+                        bid_t cblk = cache.cache_blocks[index].block->blk;
+                        if(cblk == blk || cblk == sblk) continue;
+                        walk_cnt += walk_manager.nblockwalks(cblk * nblocks + blk);
+                        walk_cnt += walk_manager.nblockwalks(cblk * nblocks + sblk);
+                    }
+                }
+
+                walk_cnt += walk_manager.nblockwalks(blk * nblocks + sblk) + walk_manager.nblockwalks(blk * nblocks + blk);
+                if(sblk != blk) {
+                    walk_cnt += walk_manager.nblockwalks(sblk * nblocks + blk) + walk_manager.nblockwalks(sblk * nblocks + sblk);
+                }
+
+                if(walk_cnt > nwalks) {
+                    nwalks = walk_cnt;
+                    first_block = blk, second_block = sblk;
+                }
+            }
+        }
+        return nwalks;
+    }
+
+    void choose_blocks(graph_cache &cache, graph_walk<vid_t, SecondOrder> &walk_manager)
+    {
+        wid_t total_walks = walk_manager.nwalks();
+        if(total_walks < 1000) {
+            choose_double_blocks(cache, walk_manager);
+        } else {
+            wid_t nwalks = choose_single_blocks(cache, walk_manager);
+            if(nwalks < 100) {
+                choose_double_blocks(cache, walk_manager);
+            }
+        }
+    }
+
+    template<typename walk_data_t, WalkType walk_type>
+    bid_t swap_block(graph_cache &cache, graph_walk<walk_data_t, walk_type>& walk_manager, bid_t exclude_cache_index) {
+        bid_t blk = 0;
+        int life = -1;
+        wid_t active_walks_cnt = 0xffffffff;
+        for(bid_t p = 0; p < cache.ncblock; ++p) {
+            if(p == exclude_cache_index) continue;
+            if(cache.cache_blocks[p].block == NULL) {
+                blk = p; break;
+            }
+            if(walk_manager.block_active_walks(cache.cache_blocks[p].block->blk) < active_walks_cnt) {
+                blk = p;
+                life = cache.cache_blocks[p].life;
+                active_walks_cnt = walk_manager.block_active_walks(cache.cache_blocks[p].block->blk);
+            } else if(walk_manager.block_active_walks(cache.cache_blocks[p].block->blk) == active_walks_cnt && cache.cache_blocks[p].life > life) {
+                blk = p;
+                life = cache.cache_blocks[p].life;
+            }
+        }
+        if(cache.cache_blocks[blk].block != NULL) {
+            cache.cache_blocks[blk].block->cache_index = walk_manager.global_blocks->nblocks;
+        }
+        return blk;
+    }
+
+public:
+    surfer_scheduler_t(metrics& m) : base_scheduler(m) {
+        first_block = std::numeric_limits<bid_t>::max();
+        second_block = std::numeric_limits<bid_t>::max();
+    }
+
+    template <typename walk_data_t, WalkType walk_type>
+    bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager) {
+        if(second_block != std::numeric_limits<bid_t>::max()) {
+            bid_t ret = second_block;
+            second_block = std::numeric_limits<bid_t>::max();
+            return ret;
+        }
+
+        choose_blocks(cache, walk_manager);
+
+#ifdef TESTDEBUG
+        logstream(LOG_DEBUG) << "second-order schedule blocks [" << first_block << ", " << second_block << "]" << std::endl;
+#endif
+
+        _m.start_time("second_order_scheduler_swap_blocks");
+        /* increase the cache block life */
+        for(bid_t p = 0; p < cache.ncblock; ++p) cache.cache_blocks[p].life++;
+        bid_t p_cache_index = (*(walk_manager.global_blocks))[first_block].cache_index;
+        if(p_cache_index != walk_manager.global_blocks->nblocks) {
+            cache.cache_blocks[p_cache_index].life = 0;
+        }else {
+            p_cache_index = swap_block(cache, walk_manager, walk_manager.global_blocks->nblocks);
+            cache.cache_blocks[p_cache_index].life = 0;
+            driver.load_block_info(cache, walk_manager.global_blocks, p_cache_index, first_block);
+        }
+
+        if(second_block != std::numeric_limits<bid_t>::max()) {
+            bid_t cache_index = (*(walk_manager.global_blocks))[second_block].cache_index;
+            if(cache_index != walk_manager.global_blocks->nblocks) {
+                cache.cache_blocks[cache_index].life = 0;
+            }else {
+                cache_index = swap_block(cache, walk_manager, p_cache_index);
+                cache.cache_blocks[cache_index].life = 0;
+                driver.load_block_info(cache, walk_manager.global_blocks, cache_index, second_block);
+            }
+        }
+
+        _m.stop_time("second_order_scheduler_swap_blocks");
+        bid_t ret = first_block;
+        first_block = std::numeric_limits<bid_t>::max();
+        return ret;
+    }
+};
 template<typename BaseType>
 class scheduler : public BaseType {
 public:

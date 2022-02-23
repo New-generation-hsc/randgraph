@@ -1,7 +1,7 @@
 
 CC = g++
 INCLUDE = -I.
-FLAGS = -std=c++11 -lpthread -fopenmp -Wall -D FASTSKIP 
+FLAGS = -std=c++11 -lpthread -fopenmp -Wall -D FASTSKIP
 
 apps : test/preprocess test/walk test/test_sample test/node2vec test/autoregressive test/gen test/pagerank test/max_degree test/degree_dist
 

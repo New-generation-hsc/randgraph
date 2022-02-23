@@ -53,14 +53,7 @@ public:
         int run_count = 0;
         while(!walk_manager->test_finished_walks()) {
             bid_t select_block = block_scheduler->schedule(*cache, *driver, *walk_manager);
-            if(walk_type == FirstOrder) {
-                exec_block(userprogram, select_block, sampler_context, run_count);
-            } else {
-                bid_t pblk = select_block / walk_manager->global_blocks->nblocks;
-                bid_t cblk = select_block % walk_manager->global_blocks->nblocks;
-                exec_block(userprogram, cblk, sampler_context, run_count);
-                if(pblk != cblk) exec_block(userprogram, pblk, sampler_context, run_count);
-            }
+            exec_block(userprogram, select_block, sampler_context, run_count);
             run_count++;
         }
         logstream(LOG_DEBUG) << gtimer.runtime() << "s, total run count : " << run_count << std::endl;
