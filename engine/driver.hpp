@@ -37,12 +37,12 @@ public:
         this->destory();
 
         std::string beg_pos_name = get_beg_pos_name(conf->base_name, conf->fnum);
+        if(conf->reordered) beg_pos_name += ".ro";
         std::string csr_name = get_csr_name(conf->base_name, conf->fnum);
-        std::string degree_name = get_degree_name(conf->base_name, conf->fnum);
+        if(conf->reordered) csr_name += ".ro";
 
         vertdesc = open(beg_pos_name.c_str(), O_RDONLY);
         edgedesc = open(csr_name.c_str(), O_RDONLY);
-        degdesc = open(degree_name.c_str(), O_RDONLY);
         _weighted = conf->is_weighted;
 
         if (_weighted)
@@ -99,7 +99,6 @@ public:
     void destory() {
         if(vertdesc > 0) close(vertdesc);
         if(edgedesc > 0) close(edgedesc);
-        if(degdesc > 0) close(degdesc);
         if(_weighted) {
             if(prob_desc > 0) close(prob_desc);
             if(alias_desc > 0) close(alias_desc);

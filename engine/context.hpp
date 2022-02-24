@@ -78,6 +78,8 @@ public:
     second_order_param_t app_param;
     vid_t prev_vertex;
     vid_t *prev_adj_start, *prev_adj_end;
+    std::unordered_set<vid_t> prev_neighbors;
+
     walk_context(second_order_param_t param, vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
                  vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e) : context(vertex, num_vertices, start, end, seed)
     {
@@ -85,13 +87,13 @@ public:
         this->prev_vertex = prev;
         this->prev_adj_start = p_adj_s;
         this->prev_adj_end = p_adj_e;
+        prev_neighbors = std::unordered_set<vid_t>(prev_adj_start, prev_adj_end);
     }
 
     void query_neigbors_weight(std::vector<real_t> &adj_weights) const
     {
         size_t deg = static_cast<size_t>(adj_end - adj_start);
         adj_weights.resize(deg);
-        std::unordered_set<vid_t> prev_neighbors(prev_adj_start, prev_adj_end);
         for(size_t index = 0; index < deg; ++index) {
             if(*(adj_start + index) == prev_vertex) {
                 adj_weights[index] = app_param.gamma;
@@ -103,10 +105,23 @@ public:
         }
     }
 
+    real_t query_max_weight() const {
+        return std::max(app_param.gamma, std::max(app_param.alpha + app_param.beta, app_param.delta));
+    }
+
+    real_t query_vertex_weight(size_t index) const {
+        if(*(adj_start + index) == prev_vertex) {
+            return app_param.gamma;
+        }else if(prev_neighbors.find(*(adj_start + index)) != prev_neighbors.end()) {
+            return app_param.alpha + app_param.beta;
+        }else {
+            return app_param.delta;
+        }
+    }
+
     void query_comm_neigbors_weight(std::vector<real_t> &adj_weights, std::vector<vid_t> &comm_neighbors, real_t &total_weight) const
     {
         size_t deg = static_cast<size_t>(adj_end - adj_start);
-        std::unordered_set<vid_t> prev_neighbors(prev_adj_start, prev_adj_end);
         real_t comm_weight_sum = 0;
         for (size_t index = 0; index < deg; ++index)
         {

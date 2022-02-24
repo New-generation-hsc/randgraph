@@ -523,6 +523,7 @@ private:
                 }
             }
         }
+        if(first_block == second_block) second_block = std::numeric_limits<bid_t>::max();
         return nwalks;
     }
 

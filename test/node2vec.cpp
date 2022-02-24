@@ -26,6 +26,7 @@ int main(int argc, const char *argv[])
     vid_t nvertices;
     eid_t nedges;
     bool weighted = get_option_bool("weighted");
+    bool reordered = get_option_bool("reordered");
     load_graph_meta(base_name, &nvertices, &nedges, weighted);
 
     graph_config conf = {
@@ -35,7 +36,8 @@ int main(int argc, const char *argv[])
         (tid_t)omp_get_max_threads(),
         nvertices,
         nedges,
-        weighted
+        weighted,
+        reordered
     };
 
     graph_block blocks(&conf);
@@ -80,8 +82,8 @@ int main(int argc, const char *argv[])
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
     scheduler<surfer_scheduler_t> walk_scheduler(m);
-    complex_sample_context_t sample_context(sampler, &its_sampler);
-    // naive_sample_context_t sample_context(sampler);
+    // complex_sample_context_t sample_context(sampler, &its_sampler);
+    naive_sample_context_t sample_context(sampler);
 
     engine.prologue(userprogram);
     engine.run(userprogram, &walk_scheduler, &sample_context);

@@ -389,10 +389,20 @@ public:
 
     virtual vid_t sample(const walk_context<SECONDORDERCTX> &ctx, walk_timer* wtimer)
     {
-        std::vector<real_t> adj_weights;
-        ctx.query_neigbors_weight(adj_weights);
-        size_t off = reject_sample_impl(adj_weights.begin(), adj_weights.end(), ctx.local_seed);
-        return ctx.adj_start[off];
+        // std::vector<real_t> adj_weights;
+        // ctx.query_neigbors_weight(adj_weights);
+        // size_t off = reject_sample_impl(adj_weights.begin(), adj_weights.end(), ctx.local_seed);
+        // return ctx.adj_start[off];
+        size_t n = static_cast<size_t>(ctx.adj_end - ctx.adj_start);
+        real_t pmax = ctx.query_max_weight();
+        real_t rand_val = static_cast<real_t>(rand_r(ctx.local_seed)) / static_cast<real_t>(RAND_MAX) * pmax;
+        size_t rand_pos = rand_r(ctx.local_seed) % n;
+        while (rand_val > ctx.query_vertex_weight(rand_pos))
+        {
+            rand_pos = rand_r(ctx.local_seed) % n;
+            rand_val = static_cast<real_t>(rand_r(ctx.local_seed)) / static_cast<real_t>(RAND_MAX) * pmax;
+        }
+        return ctx.adj_start[rand_pos];
     }
 
     virtual vid_t sample(const walk_context<BIASEDSECONDORDERCTX> &ctx, walk_timer* wtimer)
@@ -605,8 +615,8 @@ public:
 
     virtual sample_policy_t* sample_switch(cache_block* run_block, wid_t nblockwalks, wid_t total_walks) {
         vid_t nverts = run_block->block->nverts;
-        if(nblockwalks < 0.8 * nverts) return second_policy;
-        else return first_policy;
+        if(nverts < 100) return first_policy;
+        else return second_policy;
     }
 };
 
