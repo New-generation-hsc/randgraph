@@ -82,8 +82,8 @@ int main(int argc, const char *argv[])
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
     scheduler<naive_graphwalker_scheduler_t> walk_scheduler(m);
-    complex_sample_context_t sample_context(sampler, &its_sampler);
-    // naive_sample_context_t sample_context(sampler);
+    // complex_sample_context_t sample_context(sampler, &its_sampler);
+    naive_sample_context_t sample_context(sampler);
 
     engine.prologue(userprogram);
     engine.run(userprogram, &walk_scheduler, &sample_context);
