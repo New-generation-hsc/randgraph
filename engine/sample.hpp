@@ -577,10 +577,15 @@ public:
 template<CtxType ctx_type>
 vid_t vertex_sample(const walk_context<ctx_type> &ctx, sample_policy_t *sampler, walk_timer *wtimer = nullptr) {
     eid_t deg = (eid_t)(ctx.adj_end - ctx.adj_start);
-    if(deg > 0) {
+    // if(deg > 0) {
+    //     return sampler->sample(ctx, wtimer);
+    // } else {
+    //     return rand_r(ctx.local_seed) % ctx.nvertices;
+    // }
+    if(deg == 0) return rand_r(ctx.local_seed) % ctx.nvertices;
+    else if(deg == 1) return *ctx.adj_start;
+    else {
         return sampler->sample(ctx, wtimer);
-    } else {
-        return rand_r(ctx.local_seed) % ctx.nvertices;
     }
 }
 
