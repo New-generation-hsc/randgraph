@@ -5,7 +5,7 @@
 #include "api/types.hpp"
 
 /** config
- * 
+ *
  * This file contribute to define the graph config structure
  */
 
@@ -18,6 +18,7 @@ struct graph_config {
     vid_t nvertices;
     eid_t nedges;
     bool is_weighted;
+    bool reordered;
 };
 
 #endif
