@@ -27,6 +27,7 @@ int main(int argc, const char *argv[])
     eid_t nedges;
     bool weighted = get_option_bool("weighted");
     bool reordered = get_option_bool("reordered");
+    bool filter = get_option_bool("filter");
     load_graph_meta(base_name, &nvertices, &nedges, weighted);
 
     graph_config conf = {
@@ -37,14 +38,15 @@ int main(int argc, const char *argv[])
         nvertices,
         nedges,
         weighted,
-        reordered
+        reordered,
+        filter
     };
 
     graph_block blocks(&conf);
     metrics m("node2vec");
     graph_driver driver(&conf, m);
 
-    graph_walk<vid_t, SecondOrder> walk_mangager(conf.base_name, conf.nvertices, conf.nthreads, driver, blocks);
+    graph_walk<vid_t, SecondOrder> walk_mangager(conf, driver, blocks);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
     wid_t walks = (wid_t)get_option_int("walkpersource", 10);
     hid_t steps = (hid_t)get_option_int("length", 80);

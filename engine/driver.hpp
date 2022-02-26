@@ -36,10 +36,9 @@ public:
     void setup(graph_config *conf) {
         this->destory();
 
-        std::string beg_pos_name = get_beg_pos_name(conf->base_name, conf->fnum);
-        if(conf->reordered) beg_pos_name += ".ro";
-        std::string csr_name = get_csr_name(conf->base_name, conf->fnum);
-        if(conf->reordered) csr_name += ".ro";
+        std::string beg_pos_name = get_beg_pos_name(conf->base_name, conf->fnum, conf->reordered);
+        std::string csr_name = get_csr_name(conf->base_name, conf->fnum, conf->reordered);
+        logstream(LOG_DEBUG) << "load beg_pos_name : " << beg_pos_name << ", csr_name : " << csr_name << std::endl;
 
         vertdesc = open(beg_pos_name.c_str(), O_RDONLY);
         edgedesc = open(csr_name.c_str(), O_RDONLY);

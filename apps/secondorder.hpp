@@ -129,7 +129,7 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
         if (cur_block->weights == nullptr && cur_block->acc_weights == nullptr)
         {
             walk_context<SECONDORDERCTX> ctx(param, cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
-                                                    seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail);
+                                                    seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail, walk_manager->bf);
             next_vertex = vertex_sample(ctx, sampler, &wtimer);
         }
         else

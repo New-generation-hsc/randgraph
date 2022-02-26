@@ -128,10 +128,8 @@ public:
     std::vector<block_t> blocks;
 
     graph_block(graph_config* conf) {
-        std::string vert_block_name = get_vert_blocks_name(conf->base_name, conf->blocksize);
-        if(conf->reordered) vert_block_name += ".ro";
-        std::string edge_block_name = get_edge_blocks_name(conf->base_name, conf->blocksize);
-        if(conf->reordered) edge_block_name += ".ro";
+        std::string vert_block_name = get_vert_blocks_name(conf->base_name, conf->blocksize, conf->reordered);
+        std::string edge_block_name = get_edge_blocks_name(conf->base_name, conf->blocksize, conf->reordered);
 
         std::vector<vid_t> vblocks = load_graph_blocks<vid_t>(vert_block_name);
         std::vector<eid_t> eblocks = load_graph_blocks<eid_t>(edge_block_name);

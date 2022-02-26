@@ -65,12 +65,16 @@ std::string remove_extension(std::string const & filename) {
     return p>0&&p!=std::string::npos ? filename.substr(0, p) : filename;
 }
 
-inline std::string get_beg_pos_name(std::string const & base_name, int fnum) {
-    return concatnate_name(base_name, fnum) + ".beg";
+inline std::string get_beg_pos_name(std::string const & base_name, int fnum, bool reordered=false) {
+    std::string ans = concatnate_name(base_name, fnum) + ".beg";
+    if(reordered) ans += ".ro";
+    return ans;
 }
 
-inline std::string get_csr_name(std::string const & base_name, int fnum) {
-    return concatnate_name(base_name, fnum) + ".csr";
+inline std::string get_csr_name(std::string const & base_name, int fnum, bool reordered=false) {
+    std::string ans = concatnate_name(base_name, fnum) + ".csr";
+    if(reordered) ans += ".ro";
+    return ans;
 }
 
 inline std::string get_degree_name(std::string const & base_name, int fnum) {
@@ -93,13 +97,21 @@ inline std::string get_accumulate_name(std::string const & base_name, int fnum) 
     return concatnate_name(base_name, fnum) + ".acc";
 }
 
-inline std::string get_vert_blocks_name(std::string const &base_name, size_t blocksize)
-{
-    return concatnate_name(base_name, blocksize / (1024 * 1024)) + "MB.vert.blocks";
+inline std::string get_bloomfilter_name(std::string const & base_name, int fnum) {
+    return concatnate_name(base_name, fnum) + ".bf";
 }
 
-inline std::string get_edge_blocks_name(std::string const & base_name, size_t blocksize) {
-    return concatnate_name(base_name, blocksize / (1024 * 1024)) + "MB.edge.blocks";
+inline std::string get_vert_blocks_name(std::string const &base_name, size_t blocksize, bool reordered=false)
+{
+    std::string ans = concatnate_name(base_name, blocksize / (1024 * 1024)) + "MB.vert.blocks";
+    if(reordered) ans += ".ro";
+    return ans;
+}
+
+inline std::string get_edge_blocks_name(std::string const & base_name, size_t blocksize, bool reordered=false) {
+    std::string ans = concatnate_name(base_name, blocksize / (1024 * 1024)) + "MB.edge.blocks";
+    if(reordered) ans += ".ro";
+    return ans;
 }
 
 inline std::string get_ratio_name(std::string const & base_name, int fnum) {

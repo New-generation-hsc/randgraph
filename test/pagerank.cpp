@@ -40,7 +40,7 @@ int main(int argc, const char* argv[]) {
     metrics m("pagerank");
     graph_driver driver(&conf, m);
 
-    graph_walk<empty_data_t, FirstOrder> walk_mangager(conf.base_name, conf.nvertices, conf.nthreads, driver, blocks);
+    graph_walk<empty_data_t, FirstOrder> walk_mangager(conf, driver, blocks);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
     vid_t firstsource = (vid_t)get_option_int("firstsource", 10009);
     // vid_t numsources = (vid_t)get_option_int("numsources", 4847571);

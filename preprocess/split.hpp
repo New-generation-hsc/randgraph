@@ -27,8 +27,7 @@ size_t split_blocks(const std::string& filename, int fnum, size_t block_size, bo
     vblocks.push_back(cur_pos);
     eblocks.push_back(rd_edges);
 
-    std::string name = concatnate_name(filename, fnum) + ".beg";
-    if(reordered) name += ".ro";
+    std::string name = get_beg_pos_name(filename, fnum, true);
     int fd = open(name.c_str(), O_RDONLY);
     assert(fd >= 0);
     vid_t nvertices = lseek(fd, 0, SEEK_END) / sizeof(eid_t);
@@ -60,15 +59,13 @@ size_t split_blocks(const std::string& filename, int fnum, size_t block_size, bo
     eblocks.push_back(rd_edges);
 
     /** write the vertex split points into vertex block file */
-    std::string vblockfile = get_vert_blocks_name(filename, block_size);
-    if(reordered) vblockfile += ".ro";
+    std::string vblockfile = get_vert_blocks_name(filename, block_size, reordered);
     auto vblf = std::fstream(vblockfile.c_str(), std::ios::out | std::ios::binary);
     vblf.write((char*)&vblocks[0], vblocks.size() * sizeof(vid_t));
     vblf.close();
 
     /** write the edge split points into edge block file */
-    std::string eblockfile = get_edge_blocks_name(filename, block_size);
-    if(reordered) eblockfile += ".ro";
+    std::string eblockfile = get_edge_blocks_name(filename, block_size, reordered);
     auto eblf = std::fstream(eblockfile.c_str(), std::ios::out | std::ios::binary);
     eblf.write((char*)&eblocks[0], eblocks.size() * sizeof(eid_t));
     eblf.close();

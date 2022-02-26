@@ -10,6 +10,7 @@
 #include "api/types.hpp"
 #include "util/util.hpp"
 #include "util/io.hpp"
+#include "util/hash.hpp"
 
 /* the block structure used for precompute */
 struct pre_block_t {
@@ -390,5 +391,64 @@ void calc_vertex_neighbor_dist(const std::string& filename, int fnum, size_t blo
 
     close(vertdesc);
     close(edgedesc);
+}
+
+/**
+ * This method does following things:
+ * using bloom filter to store the top100 high-degree vertex neighbors
+*/
+void make_top100_bloom_filter(const std::string& filename, int fnum, size_t blocksize) {
+    std::string vert_block_name = get_vert_blocks_name(filename, blocksize, true);
+    std::string edge_block_name = get_edge_blocks_name(filename, blocksize, true);
+    std::string beg_pos_name = get_beg_pos_name(filename, fnum, true);
+    std::string csr_name = get_csr_name(filename, fnum, true);
+
+    std::vector<vid_t> vblocks = load_graph_blocks<vid_t>(vert_block_name);
+    std::vector<eid_t> eblocks = load_graph_blocks<eid_t>(edge_block_name);
+
+    int vertdesc = open(beg_pos_name.c_str(), O_RDONLY);
+    int edgedesc = open(csr_name.c_str(), O_RDONLY);
+    assert(vertdesc > 0 && edgedesc > 0);
+
+    bid_t nblocks = vblocks.size() - 1;
+    logstream(LOG_INFO) << "load vblocks and eblocks successfully, block count : " << nblocks << std::endl;
+    pre_block_t block;
+
+    bid_t num_blocks = 0;
+    while(num_blocks < nblocks) {
+        if(vblocks[num_blocks] >= 100) break;
+        num_blocks++;
+    }
+
+    eid_t num_edges = eblocks[num_blocks];
+    BloomFilter bf;
+    bf.create(num_edges);
+    bf.set_num_blocks(num_blocks);
+
+    for(bid_t blk = 0; blk < num_blocks; blk++) {
+        block.nverts = vblocks[blk + 1] - vblocks[blk];
+        block.nedges = eblocks[blk + 1] - eblocks[blk];
+        block.start_vert = vblocks[blk];
+        block.start_edge = eblocks[blk];
+
+        block.beg_pos = (eid_t*)realloc(block.beg_pos, (block.nverts + 1) * sizeof(eid_t));
+        block.csr     = (vid_t*)realloc(block.csr, block.nedges * sizeof(vid_t));
+
+        pread(vertdesc, block.beg_pos, (block.nverts + 1) * sizeof(eid_t), block.start_vert * sizeof(eid_t));
+        pread(edgedesc, block.csr, block.nedges * sizeof(vid_t), block.start_edge * sizeof(vid_t));
+
+        for(vid_t v = 0; v < block.nverts; v++) {
+            for(eid_t off = block.beg_pos[v] - block.start_edge; off < block.beg_pos[v+1] - block.start_edge; off++) {
+                bf.insert(block.start_vert + v, block.csr[off]);
+            }
+        }
+        logstream(LOG_INFO) << "finish making bloom filter for block = " << blk << std::endl;
+    }
+    logstream(LOG_DEBUG) << "make bloomfilter for num_blocks = " << num_blocks << ", num_vertex = " << vblocks[num_blocks] << ", num_edges = " << num_edges << std::endl;
+
+    // dump the bloomfilter
+    std::string output = get_bloomfilter_name(filename, fnum);
+    bf.dump_bloom_filter(output);
+    logstream(LOG_DEBUG) << "successfully dump bloom filter." << std::endl;
 }
 #endif

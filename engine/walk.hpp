@@ -4,6 +4,7 @@
 #include <algorithm>
 #include "api/types.hpp"
 #include "api/graph_buffer.hpp"
+#include "util/hash.hpp"
 #include "cache.hpp"
 
 class block_desc_manager_t {
@@ -43,10 +44,12 @@ public:
     std::vector<std::vector<wid_t>> block_nmwalk;       /* record each block number of walks in memroy */
     std::vector<std::vector<wid_t>> block_ndwalk;       /* record each block number of walks in disk */
     graph_block *global_blocks;
-    graph_walk(const std::string& name, vid_t nverts, tid_t threads, graph_driver& driver, graph_block &blocks) {
-        base_name = name;
-        nvertices = nverts;
-        nthreads = threads;
+
+    BloomFilter *bf;
+    graph_walk(graph_config& conf, graph_driver& driver, graph_block &blocks) {
+        base_name = conf.base_name;
+        nvertices = conf.nvertices;
+        nthreads = conf.nthreads;
         global_driver = &driver;
         global_blocks = &blocks;
         nblocks = global_blocks->nblocks;
@@ -85,6 +88,13 @@ public:
             std::string walk_name = get_walk_name(base_name, blk);
             if(test_exists(walk_name)) unlink(walk_name.c_str());
         }
+
+        bf = nullptr;
+        if(conf.filter && conf.reordered) {
+            std::string filter_name = get_bloomfilter_name(base_name, 0);
+            bf = new BloomFilter();
+            bf->load_bloom_filter(filter_name);
+        }
     }
 
     ~graph_walk()
@@ -105,6 +115,8 @@ public:
             if(test_exists(walk_name)) unlink(walk_name.c_str());
         }
         walks.destroy();
+
+        if(bf) delete bf;
     }
 
     void move_walk(const walker_t<walk_data_t> &walker)
