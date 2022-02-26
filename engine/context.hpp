@@ -106,6 +106,7 @@ public:
     }
 
     real_t query_max_weight() const {
+        if(cur_vertex == prev_vertex) return app_param.alpha + app_param.beta;
         return std::max(app_param.gamma, std::max(app_param.alpha + app_param.beta, app_param.delta));
     }
 
