@@ -90,14 +90,13 @@ public:
         this->prev_adj_start = p_adj_s;
         this->prev_adj_end = p_adj_e;
         this->bf = filter;
-        prev_neighbors = std::unordered_set<vid_t>(prev_adj_start, prev_adj_end);
     }
 
     void query_neigbors_weight(std::vector<real_t> &adj_weights)
     {
         size_t deg = static_cast<size_t>(adj_end - adj_start);
         adj_weights.resize(deg);
-        // prev_neighbors = std::unordered_set<vid_t>(prev_adj_start, prev_adj_end);
+        prev_neighbors = std::unordered_set<vid_t>(prev_adj_start, prev_adj_end);
         for(size_t index = 0; index < deg; ++index) {
             if(*(adj_start + index) == prev_vertex) {
                 adj_weights[index] = app_param.gamma;
@@ -130,9 +129,9 @@ public:
             return app_param.delta;
         }
 
-        // if(prev_neighbors.empty()) {
-        //     prev_neighbors = std::unordered_set<vid_t>(prev_adj_start, prev_adj_end);
-        // }
+        if(prev_neighbors.empty()) {
+            prev_neighbors = std::unordered_set<vid_t>(prev_adj_start, prev_adj_end);
+        }
 
         if(prev_neighbors.find(next_vertex) != prev_neighbors.end()) {
             return app_param.alpha + app_param.beta;
@@ -145,7 +144,7 @@ public:
     {
         size_t deg = static_cast<size_t>(adj_end - adj_start);
         real_t comm_weight_sum = 0;
-        // prev_neighbors = std::unordered_set<vid_t>(prev_adj_start, prev_adj_end);
+        prev_neighbors = std::unordered_set<vid_t>(prev_adj_start, prev_adj_end);
         for (size_t index = 0; index < deg; ++index)
         {
             if (*(adj_start + index) == prev_vertex)

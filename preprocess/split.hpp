@@ -38,7 +38,7 @@ size_t split_blocks(const std::string& filename, int fnum, size_t block_size, bo
     vid_t rv;
     while(rd_verts < nvertices) {
         rv = min_value(nvertices - rd_verts, VERT_SIZE);
-        pread(fd, beg_pos, (size_t)rv * sizeof(eid_t), (off_t)rd_verts * sizeof(eid_t));
+        load_block_range(fd, beg_pos, (size_t)rv, (off_t)rd_verts * sizeof(eid_t));
         for(vid_t v = 0; v < rv; v++) {
             if(beg_pos[v] - rd_edges > max_nedges) {
                 logstream(LOG_INFO) << "Block " << vblocks.size() - 1 << " : [ " << cur_pos << ", " << rd_verts + v - 1 << " ), csr position : [ " << rd_edges << ", " << beg_pos[v-1] << " )" << std::endl;

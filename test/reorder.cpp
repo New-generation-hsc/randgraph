@@ -29,8 +29,6 @@ public:
         std::string csr_name     = get_csr_name(base_name, 0);
         int vertdesc = open(beg_pos_name.c_str(), O_RDONLY);
         int edgedesc = open(csr_name.c_str(), O_RDONLY);
-        // pread(vertdesc, reinterpret_cast<char*>(old_beg_pos.data()), sizeof(eid_t) * (v_num + 1), 0);
-        // pread(edgedesc, reinterpret_cast<char*>(old_csr.data()), sizeof(vid_t) * e_num, 0);
         load_block_range(vertdesc, old_beg_pos.data(), v_num + 1, 0);
         load_block_range(edgedesc, old_csr.data(), e_num, 0);
     }
@@ -107,12 +105,10 @@ public:
         logstream(LOG_INFO) << "start to persistent new data, new_beg_pos size = " << new_beg_pos.size() << ", new_csr size = " << new_csr.size() << std::endl;
         std::string beg_pos_name = get_beg_pos_name(base_name, 0, true);
         int fd = open(beg_pos_name.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
-        // write(fd, reinterpret_cast<char*>(new_beg_pos.data()), sizeof(eid_t) * new_beg_pos.size());
         dump_block_range(fd, new_beg_pos.data(), new_beg_pos.size(), 0);
 
         std::string csr_name = get_csr_name(base_name, 0, true);
         fd = open(csr_name.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
-        // write(fd, reinterpret_cast<char*>(new_csr.data()), sizeof(vid_t) * new_csr.size());
         dump_block_range(fd, new_csr.data(), new_csr.size(), 0);
     }
 };
