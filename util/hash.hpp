@@ -114,6 +114,8 @@ public:
 
     void set_num_blocks(size_t n_blocks) { num_blocks = n_blocks; }
 
+    size_t get_num_blocks() const { return num_blocks; }
+
     void load_bloom_filter(const std::string& filename) {
         auto stream = std::fstream(filename.c_str(), std::ios::in| std::ios::binary);
         stream.read(reinterpret_cast<char*>(&num_blocks), sizeof(size_t));

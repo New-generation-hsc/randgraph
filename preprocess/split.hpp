@@ -27,7 +27,7 @@ size_t split_blocks(const std::string& filename, int fnum, size_t block_size, bo
     vblocks.push_back(cur_pos);
     eblocks.push_back(rd_edges);
 
-    std::string name = get_beg_pos_name(filename, fnum, true);
+    std::string name = get_beg_pos_name(filename, fnum, reordered);
     int fd = open(name.c_str(), O_RDONLY);
     assert(fd >= 0);
     vid_t nvertices = lseek(fd, 0, SEEK_END) / sizeof(eid_t);
