@@ -10,6 +10,7 @@
 #include "api/constants.hpp"
 #include "api/types.hpp"
 #include "util/util.hpp"
+#include "util/hash.hpp"
 #include "util/io.hpp"
 #include "config.hpp"
 
@@ -77,6 +78,7 @@ public:
     real_t *acc_weights;
 
     bool loaded_alias;
+    BloomFilter *bf;
 
     /**
      * record each block life, when swap out, the largest life block will be evicted
@@ -92,6 +94,7 @@ public:
         prob    = NULL;
         alias   = NULL;
         acc_weights = NULL;
+        bf = nullptr;
         life = 0;
         loaded_alias = false;
     }
@@ -104,6 +107,11 @@ public:
         if(prob)    free(prob);
         if(alias)   free(alias);
         if(acc_weights) free(acc_weights);
+        if(bf) delete bf;
+    }
+
+    void make_filter(bool filter) {
+        if(filter) bf = new BloomFilter;
     }
 };
 
@@ -183,8 +191,9 @@ public:
     bid_t ncblock;                  /* number of cache blocks */
     std::vector<cache_block> cache_blocks; /* the cached blocks */
 
-    graph_cache(bid_t nblocks, size_t blocksize = BLOCK_SIZE) {
-        setup(nblocks, blocksize);
+    graph_cache(bid_t nblocks, graph_config *conf) {
+        setup(nblocks, conf->blocksize);
+        for(auto & cblk : cache_blocks) cblk.make_filter(conf->filter);
     }
 
     cache_block& operator[](size_t index) {

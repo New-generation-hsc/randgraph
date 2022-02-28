@@ -16,21 +16,27 @@ class graph_driver {
 private:
     int vertdesc, edgedesc, degdesc, whtdesc;  /* the beg_pos, csr, degree file descriptor */
     int prob_desc, alias_desc, acc_wht_desc; /* the alias table descriptor and accumulate weight descriptor */
+    int filter_desc;
     metrics &_m;
-    bool _weighted;
+    bool _weighted, _filter;
+    size_t bf_sz, tb_sz;
 public:
     graph_driver(graph_config *conf, metrics &m) : _m(m)
     {
         vertdesc = edgedesc = whtdesc = 0;
         prob_desc = alias_desc = acc_wht_desc = 0;
-        _weighted = false;
+        filter_desc = 0;
+        _weighted = _filter = false;
+        bf_sz = tb_sz = 0;
         this->setup(conf);
     }
 
     graph_driver(metrics &m) : _m(m) {
         vertdesc = edgedesc = whtdesc = 0;
         prob_desc = alias_desc = acc_wht_desc = 0;
-        _weighted = false;
+        filter_desc = 0;
+        _weighted = _filter = false;
+        bf_sz = tb_sz = 0;
     }
 
     void setup(graph_config *conf) {
@@ -43,6 +49,7 @@ public:
         vertdesc = open(beg_pos_name.c_str(), O_RDONLY);
         edgedesc = open(csr_name.c_str(), O_RDONLY);
         _weighted = conf->is_weighted;
+        _filter = conf->filter;
 
         if (_weighted)
         {
@@ -55,6 +62,13 @@ public:
             if(test_exists(acc_weight_name)) acc_wht_desc = open(acc_weight_name.c_str(), O_RDONLY);
             std::string weight_name = get_weights_name(conf->base_name, conf->fnum);
             if(test_exists(weight_name)) whtdesc = open(weight_name.c_str(), O_RDONLY);
+        }
+
+        if(conf->filter) {
+            std::string filter_name = get_bloomfilter_name(conf->base_name, conf->fnum);
+            if(test_exists(filter_name)) filter_desc = open(filter_name.c_str(), O_RDONLY);
+            bf_sz = BloomFilter::cal_hash_table_capacity(conf->blocksize / sizeof(vid_t));
+            tb_sz = BloomFilter::cal_hash_table_size(conf->blocksize / sizeof(vid_t));
         }
     }
 
@@ -76,6 +90,13 @@ public:
             load_block_weight(acc_wht_desc, cache.cache_blocks[cache_index].acc_weights, global_blocks->blocks[block_index]);
         }
         cache.cache_blocks[cache_index].loaded_alias = false;
+
+        if(_filter) {
+            _m.start_time("load_block_filter_info");
+            if(cache.cache_blocks[cache_index].bf->empty()) cache.cache_blocks[cache_index].bf->make(bf_sz);
+            load_block_range(filter_desc, cache.cache_blocks[cache_index].bf->data(), bf_sz, block_index * tb_sz);
+            _m.stop_time("load_block_filter_info");
+        }
         _m.stop_time("load_block_info");
     }
 

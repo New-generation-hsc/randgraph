@@ -45,7 +45,7 @@ public:
     std::vector<std::vector<wid_t>> block_ndwalk;       /* record each block number of walks in disk */
     graph_block *global_blocks;
 
-    BloomFilter *bf;
+    // BloomFilter *bf;
     graph_walk(graph_config& conf, graph_driver& driver, graph_block &blocks) {
         base_name = conf.base_name;
         nvertices = conf.nvertices;
@@ -89,12 +89,12 @@ public:
             if(test_exists(walk_name)) unlink(walk_name.c_str());
         }
 
-        bf = nullptr;
-        if(conf.filter && conf.reordered) {
-            std::string filter_name = get_bloomfilter_name(base_name, 0);
-            bf = new BloomFilter();
-            bf->load_bloom_filter(filter_name);
-        }
+        // bf = nullptr;
+        // if(conf.filter && conf.reordered) {
+        //     std::string filter_name = get_bloomfilter_name(base_name, 0);
+        //     bf = new BloomFilter();
+        //     bf->load_bloom_filter(filter_name);
+        // }
     }
 
     ~graph_walk()
@@ -116,7 +116,7 @@ public:
         }
         walks.destroy();
 
-        if(bf) delete bf;
+        // if(bf) delete bf;
     }
 
     void move_walk(const walker_t<walk_data_t> &walker)

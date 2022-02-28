@@ -11,7 +11,6 @@ class BloomFilter
     uint64_t hash_bitmask;
     uint64_t *table;
     size_t sz;
-    size_t num_blocks;
 
     // https://qastack.cn/programming/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
     // https://xorshift.di.unimi.it/splitmix64.c
@@ -69,7 +68,6 @@ public:
     BloomFilter() {
         table = nullptr;
         sz = 0;
-        num_blocks = 0;
     }
 
     ~BloomFilter() {
@@ -79,11 +77,20 @@ public:
     void create(uint64_t item_num) {
         uint64_t ht_capacity = cal_hash_table_capacity(item_num);
         hash_bitmask = ht_capacity - 1;
-        // table = mpool.alloc<uint64_t>(ht_capacity, MemoryInterleaved);
         table = new uint64_t[ht_capacity];
         memset(table, 0, sizeof(uint64_t) * ht_capacity);
-        sz = sizeof(uint64_t) * ht_capacity;
-        num_blocks = 0;
+        sz = ht_capacity;
+#ifdef PROFILE_BF
+        qhit_counter = 0;
+        qmiss_counter = 0;
+#endif
+    }
+
+    void make(size_t ht_capacity) {
+        sz = ht_capacity;
+        hash_bitmask = ht_capacity - 1;
+        table = new uint64_t[ht_capacity];
+        memset(table, 0, sizeof(uint64_t) * ht_capacity);
 #ifdef PROFILE_BF
         qhit_counter = 0;
         qmiss_counter = 0;
@@ -112,24 +119,21 @@ public:
         return sz;
     }
 
-    void set_num_blocks(size_t n_blocks) { num_blocks = n_blocks; }
+    uint64_t* data() { return table; }
 
-    size_t get_num_blocks() const { return num_blocks; }
+    bool empty() const { return table == nullptr; }
 
     void load_bloom_filter(const std::string& filename) {
         auto stream = std::fstream(filename.c_str(), std::ios::in| std::ios::binary);
-        stream.read(reinterpret_cast<char*>(&num_blocks), sizeof(size_t));
         stream.read(reinterpret_cast<char*>(&sz), sizeof(size_t));
-        uint64_t ht_capacity = sz / sizeof(uint64_t);
-        table = new uint64_t[ht_capacity];
-        stream.read(reinterpret_cast<char*>(table), sz);
-        hash_bitmask = ht_capacity - 1;
+        table = new uint64_t[sz];
+        stream.read(reinterpret_cast<char*>(table), sz * sizeof(uint64_t));
+        hash_bitmask = sz - 1;
     }
 
     void dump_bloom_filter(const std::string& filename) {
         auto stream = std::fstream(filename.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
-        stream.write(reinterpret_cast<char*>(&num_blocks), sizeof(size_t));
         stream.write(reinterpret_cast<char*>(&sz), sizeof(size_t));
-        stream.write(reinterpret_cast<char*>(table), sz);
+        stream.write(reinterpret_cast<char*>(table), sz * sizeof(uint64_t));
     }
 };

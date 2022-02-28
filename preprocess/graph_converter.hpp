@@ -272,6 +272,9 @@ void convert(std::string filename, graph_converter &converter, size_t blocksize 
     if(converter.is_weighted()) {
         second_order_precompute(converter.get_output_filename(), 0, blocksize);
     }
+
+    /* make bloom filter for each block */
+    make_graph_bloom_filter(converter.get_output_filename(), 0, blocksize, false);
 }
 
 /** compute the given graph each vertex point to the same block ratio */

@@ -44,7 +44,7 @@ int main(int argc, const char* argv[]) {
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
     wid_t walks = (wid_t)get_option_int("walks", 100000);
     hid_t steps = (hid_t)get_option_int("length", 25);
-    graph_cache cache(min_value(nmblocks, blocks.nblocks), conf.blocksize);
+    graph_cache cache(min_value(nmblocks, blocks.nblocks), &conf);
 
     randomwalk_conf_t app_conf = { walks, steps, 0.15 };
     userprogram_t<randomwalk_t, randomwalk_conf_t> userprogram(app_conf);

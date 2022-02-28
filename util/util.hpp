@@ -44,14 +44,6 @@ std::string concatnate_name(std::string filename, T val) {
     return ss.str();
 }
 
-template<typename T>
-void appendfile(std::string filename, T *array, size_t bsize) {
-    int fd = open(filename.c_str(), O_RDWR | O_APPEND | O_CREAT, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
-    assert(fd >= 0);
-    pwrite(fd, (char*)array, bsize * sizeof(T), 0);
-    close(fd);
-}
-
 std::string base_name(std::string const & path) {
     return path.substr(path.find_last_of("/\\")+1);
 }

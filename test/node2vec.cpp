@@ -52,7 +52,7 @@ int main(int argc, const char *argv[])
     hid_t steps = (hid_t)get_option_int("length", 80);
     real_t p = (real_t)get_option_float("p", 0.5);
     real_t q = (real_t)get_option_float("q", 2.0);
-    graph_cache cache(min_value(nmblocks, blocks.nblocks), conf.blocksize);
+    graph_cache cache(min_value(nmblocks, blocks.nblocks), &conf);
 
     second_order_param_t app_param = {(real_t)0.0, (real_t)1.0 / p, (real_t)1.0, (real_t)1.0 / q };
     second_order_conf_t app_conf = { walks, steps, app_param };
