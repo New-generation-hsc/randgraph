@@ -1,4 +1,5 @@
 #include <omp.h>
+#include <functional>
 #include "api/constants.hpp"
 #include "engine/config.hpp"
 #include "engine/cache.hpp"
@@ -28,6 +29,7 @@ int main(int argc, const char *argv[])
     bool weighted = get_option_bool("weighted");
     bool reordered = get_option_bool("reordered");
     bool filter = get_option_bool("filter");
+    bool dynamic = get_option_bool("dynamic");
     load_graph_meta(base_name, &nvertices, &nedges, weighted);
 
     graph_config conf = {
@@ -39,7 +41,8 @@ int main(int argc, const char *argv[])
         nedges,
         weighted,
         reordered,
-        filter
+        filter,
+        dynamic
     };
 
     graph_block blocks(&conf);
@@ -56,6 +59,14 @@ int main(int argc, const char *argv[])
 
     second_order_param_t app_param = {(real_t)0.0, (real_t)1.0 / p, (real_t)1.0, (real_t)1.0 / q };
     second_order_conf_t app_conf = { walks, steps, app_param };
+    second_order_func_t app_func;
+    app_func.query_equal_func = [&p, &q](const vertex_t& prev_vertex, const vertex_t& cur_vertex) { return 1.0 / p; };
+    app_func.query_comm_neighbor_func = [&p, &q](const vertex_t& prev_vertex, const vertex_t& cur_vertex) { return 1.0; };
+    app_func.query_other_vertex_func = [&p, &q](const vertex_t& prev_vertex, const vertex_t& cur_vertex) { return 1.0 / q; };
+    app_func.query_upper_bound_func = [&p, &q](const vertex_t& prev_vertex, const vertex_t& cur_vertex) { return std::max(1.0 / p, std::max(1.0, 1.0 / q)); };
+    app_func.query_lower_bound_func = [&p, &q](const vertex_t& prev_vertex, const vertex_t& cur_vertex) { return std::min(1.0 / p, std::min(1.0, 1.0 / q)); };
+    app_conf.func_param = app_func;
+
     userprogram_t<second_order_app_t, second_order_conf_t> userprogram(app_conf);
     graph_engine<vid_t, SecondOrder> engine(cache, walk_mangager, driver, conf, m);
 

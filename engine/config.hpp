@@ -20,6 +20,7 @@ struct graph_config {
     bool is_weighted;
     bool reordered;
     bool filter;
+    bool dynamic;
 };
 
 #endif

@@ -264,10 +264,18 @@ public:
     }
     virtual vid_t sample(walk_context<SECONDORDERCTX> &ctx, walk_timer* wtimer)
     {
-        std::vector<real_t> adj_weights;
-        ctx.query_neigbors_weight(adj_weights);
-        size_t off = its_sample_impl(adj_weights.begin(), adj_weights.end(), ctx.local_seed);
-        return ctx.adj_start[off];
+        wtimer->start_time("its_sample_make_cdf");
+        size_t n = static_cast<size_t>(ctx.adj_end - ctx.adj_start);
+        std::vector<real_t> adj_weights(n + 1, 0.0);
+        for(size_t index = 0; index < n; index++) {
+            adj_weights[index+1] = adj_weights[index] + ctx.query_vertex_weight(index);
+        }
+        wtimer->stop_time("its_sample_make_cdf");
+        wtimer->start_time("its_sample_vertex");
+        real_t rand_val = adj_weights[n] * (real_t)rand_r(ctx.local_seed) / (real_t)RAND_MAX;
+        size_t pos = std::upper_bound(adj_weights.begin(), adj_weights.end(), rand_val) - adj_weights.begin();
+        wtimer->stop_time("its_sample_vertex");
+        return ctx.adj_start[pos - 1];
     }
     virtual vid_t sample(walk_context<BIASEDSECONDORDERCTX> &ctx, walk_timer* wtimer)
     {
@@ -401,16 +409,34 @@ public:
         // ctx.query_neigbors_weight(adj_weights);
         // size_t off = reject_sample_impl(adj_weights.begin(), adj_weights.end(), ctx.local_seed);
         // return ctx.adj_start[off];
+        wtimer->start_time("reject_sample");
         size_t n = static_cast<size_t>(ctx.adj_end - ctx.adj_start);
-        real_t pmax = ctx.query_max_weight();
-        real_t rand_val = static_cast<real_t>(rand_r(ctx.local_seed)) / static_cast<real_t>(RAND_MAX) * pmax;
-        size_t rand_pos = rand_r(ctx.local_seed) % n;
-        while (rand_val > ctx.query_vertex_weight(rand_pos))
-        {
-            sample_policy_t::increase();
+        real_t pmax = ctx.query_max_weight(), pmin = ctx.query_min_weight();
+        // logstream(LOG_INFO) << "reject sample vertex : " << ctx.cur_vertex << ", pmax : " << pmax << ", pmin : " << pmin  << ", prev_vertex degree : " << (ctx.prev_adj_end - ctx.prev_adj_start) << ", cur_vertex degree : " << (ctx.adj_end - ctx.adj_start) << std::endl;
+        bool accept = false;
+        size_t rand_pos = 0;
+        size_t counter = 0;
+        while(!accept) {
+            real_t rand_val = static_cast<real_t>(rand_r(ctx.local_seed)) / static_cast<real_t>(RAND_MAX) * pmax;
             rand_pos = rand_r(ctx.local_seed) % n;
-            rand_val = static_cast<real_t>(rand_r(ctx.local_seed)) / static_cast<real_t>(RAND_MAX) * pmax;
+            sample_policy_t::increase();
+            if(rand_val <= pmin || rand_val < ctx.query_vertex_weight(rand_pos)) {
+                accept = true;
+            }
+            // logstream(LOG_INFO) << "reject sample vertex : " << ctx.cur_vertex << ", rand_pos : " << rand_pos << ", rand_val : " << rand_val << std::endl;
+            counter++;
+            if(counter > 500) {
+                logstream(LOG_DEBUG) << "reject sample vertex : " << ctx.cur_vertex << ", pmax : " << pmax << ", pmin : " << pmin  << ", prev_vertex degree : " << (ctx.prev_adj_end - ctx.prev_adj_start) << ", cur_vertex degree : " << (ctx.adj_end - ctx.adj_start) << std::endl;
+                exit(0);
+            }
         }
+        // while (rand_val > ctx.query_vertex_weight(rand_pos))
+        // {
+        //     sample_policy_t::increase();
+        //     rand_pos = rand_r(ctx.local_seed) % n;
+        //     rand_val = static_cast<real_t>(rand_r(ctx.local_seed)) / static_cast<real_t>(RAND_MAX) * pmax;
+        // }
+        wtimer->stop_time("reject_sample");
         return ctx.adj_start[rand_pos];
     }
 
@@ -582,9 +608,18 @@ public:
     }
 };
 
+template<CtxType ctx_type>
+bool accept_sampler(walk_context<ctx_type> &ctx) { return true; }
+
+template<>
+bool accept_sampler<SECONDORDERCTX>(walk_context<SECONDORDERCTX>& ctx) {
+    real_t pmax = ctx.query_max_weight(), pmin = ctx.query_min_weight();
+    if(pmax / pmin > 10.0) return false;
+    return true;
+}
 
 template<CtxType ctx_type>
-vid_t vertex_sample(walk_context<ctx_type> &ctx, sample_policy_t *sampler, walk_timer *wtimer = nullptr) {
+vid_t vertex_sample(walk_context<ctx_type> &ctx, sample_policy_t *sampler, walk_timer *wtimer = nullptr, bool dynamic = false) {
     eid_t deg = (eid_t)(ctx.adj_end - ctx.adj_start);
     // if(deg > 0) {
     //     return sampler->sample(ctx, wtimer);
@@ -594,6 +629,10 @@ vid_t vertex_sample(walk_context<ctx_type> &ctx, sample_policy_t *sampler, walk_
     if(deg == 0) return rand_r(ctx.local_seed) % ctx.nvertices;
     else if(deg == 1) return *ctx.adj_start;
     else {
+        if(dynamic && !accept_sampler(ctx)) {
+            its_sample_t its_sampler;
+            return its_sampler.sample(ctx, wtimer);
+        }
         return sampler->sample(ctx, wtimer);
     }
 }

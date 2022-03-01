@@ -81,7 +81,7 @@ public:
         {
             #pragma omp parallel for schedule(static)
             for(wid_t idx = 0; idx < nwalks; idx++) {
-                userprogram.update_walk(walk_manager->walks[idx], cache, walk_manager, sampler, &seeds[omp_get_thread_num()]);
+                userprogram.update_walk(walk_manager->walks[idx], cache, walk_manager, sampler, &seeds[omp_get_thread_num()], conf->dynamic);
             }
         }
         _m.stop_time("exec_block_walk");
