@@ -39,6 +39,10 @@ public:
         bf_sz = tb_sz = 0;
     }
 
+    void set_filter(bool filter) {
+        _filter = filter;
+    }
+
     void setup(graph_config *conf) {
         this->destory();
 

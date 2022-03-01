@@ -144,10 +144,12 @@ public:
 
 class sample_policy_t : public sample_t
 {
+private:
+    uint64_t sample_counter;
 public:
-    sample_policy_t() {}
-    sample_policy_t(bool acc_weight) : sample_t(acc_weight) {}
-    sample_policy_t(bool alias, bool acc_weight) : sample_t(alias, acc_weight) {}
+    sample_policy_t() { sample_counter = 0; }
+    sample_policy_t(bool acc_weight) : sample_t(acc_weight) { sample_counter = 0; }
+    sample_policy_t(bool alias, bool acc_weight) : sample_t(alias, acc_weight) { sample_counter = 0; }
 
     virtual size_t sample(const std::vector<real_t>& weights) {
         return INF;
@@ -172,6 +174,12 @@ public:
     }
     virtual std::string sample_name() const {
         return "base_sample_policy";
+    }
+    void increase() {
+        __sync_fetch_and_add(&sample_counter, 1ul);
+    }
+    void report() {
+        std::cout << "sample counter : " << sample_counter << std::endl;
     }
 };
 
@@ -399,6 +407,7 @@ public:
         size_t rand_pos = rand_r(ctx.local_seed) % n;
         while (rand_val > ctx.query_vertex_weight(rand_pos))
         {
+            sample_policy_t::increase();
             rand_pos = rand_r(ctx.local_seed) % n;
             rand_val = static_cast<real_t>(rand_r(ctx.local_seed)) / static_cast<real_t>(RAND_MAX) * pmax;
         }

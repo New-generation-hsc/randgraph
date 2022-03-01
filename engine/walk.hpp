@@ -45,6 +45,8 @@ public:
     std::vector<std::vector<wid_t>> block_ndwalk;       /* record each block number of walks in disk */
     graph_block *global_blocks;
 
+    bool load_bf;
+
     // BloomFilter *bf;
     graph_walk(graph_config& conf, graph_driver& driver, graph_block &blocks) {
         base_name = conf.base_name;
@@ -95,6 +97,7 @@ public:
         //     bf = new BloomFilter();
         //     bf->load_bloom_filter(filter_name);
         // }
+        load_bf = conf.filter;
     }
 
     ~graph_walk()

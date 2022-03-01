@@ -129,15 +129,18 @@ public:
             return app_param.delta;
         }
 
-        if(prev_neighbors.empty()) {
-            prev_neighbors = std::unordered_set<vid_t>(prev_adj_start, prev_adj_end);
-        }
+        // if(prev_neighbors.empty()) {
+        //     prev_neighbors = std::unordered_set<vid_t>(prev_adj_start, prev_adj_end);
+        // }
 
-        if(prev_neighbors.find(next_vertex) != prev_neighbors.end()) {
-            return app_param.alpha + app_param.beta;
-        }else {
-            return app_param.delta;
-        }
+        // if(prev_neighbors.find(next_vertex) != prev_neighbors.end()) {
+        //     return app_param.alpha + app_param.beta;
+        // }else {
+        //     return app_param.delta;
+        // }
+        bool exist = std::binary_search(prev_adj_start, prev_adj_end, next_vertex);
+        if(exist) return app_param.alpha + app_param.beta;
+        else return app_param.delta;
     }
 
     void query_comm_neigbors_weight(std::vector<real_t> &adj_weights, std::vector<vid_t> &comm_neighbors, real_t &total_weight)

@@ -52,8 +52,13 @@ public:
         gtimer.start_time();
         int run_count = 0;
         while(!walk_manager->test_finished_walks()) {
+            wid_t total_walks = walk_manager->nwalks();
+            // if(total_walks <= 1000000) {
+            //     driver->set_filter(false);
+            //     walk_manager->load_bf = false;
+            // }
             bid_t select_block = block_scheduler->schedule(*cache, *driver, *walk_manager);
-            exec_block(userprogram, select_block, sampler_context, run_count);
+            exec_block(userprogram, select_block, sampler_context, run_count, total_walks);
             run_count++;
         }
         logstream(LOG_DEBUG) << gtimer.runtime() << "s, total run count : " << run_count << std::endl;
@@ -83,10 +88,9 @@ public:
     }
 
     template <typename AppType, typename AppConfig>
-    void exec_block(userprogram_t<AppType, AppConfig> &userprogram, bid_t exec_block, sample_context_t *sampler_context, int run_count) {
+    void exec_block(userprogram_t<AppType, AppConfig> &userprogram, bid_t exec_block, sample_context_t *sampler_context, int run_count, wid_t total_walks) {
         block_walks_impl_t<walk_type> block_state;
         wid_t approximate_walks = block_state.query_block_state(*walk_manager, *cache, exec_block);
-        wid_t total_walks = walk_manager->nwalks();
         bid_t cache_index = (*(walk_manager->global_blocks))[exec_block].cache_index;
         cache_block *run_block  = &cache->cache_blocks[cache_index];
         sample_policy_t *sampler = sampler_context->sample_switch(run_block, approximate_walks, total_walks);
