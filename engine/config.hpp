@@ -19,6 +19,8 @@ struct graph_config {
     eid_t nedges;
     bool is_weighted;
     bool reordered;
+    bool filter;
+    bool dynamic;
 };
 
 #endif

@@ -44,7 +44,7 @@ public:
     }
 
     template <typename walk_data_t, WalkType walk_type>
-    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler, unsigned int *seed)
+    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler, unsigned int *seed, bool dynamic)
     {
         logstream(LOG_ERROR) << "you are using a generic method." << std::endl;
         // update_strategy_t<randomwalk_conf_t, walk_data_t, walk_type, SampleType>::update_walk(_conf, walker, cache, walk_manager, sampler);
@@ -74,7 +74,7 @@ void randomwalk_t::prologue<empty_data_t, FirstOrder>(graph_walk<empty_data_t, F
 }
 
 template <>
-void randomwalk_t::update_walk<empty_data_t, FirstOrder>(const walker_t<empty_data_t> &walker, graph_cache *cache, graph_walk<empty_data_t, FirstOrder> *walk_manager, sample_policy_t *sampler, unsigned int *seed)
+void randomwalk_t::update_walk<empty_data_t, FirstOrder>(const walker_t<empty_data_t> &walker, graph_cache *cache, graph_walk<empty_data_t, FirstOrder> *walk_manager, sample_policy_t *sampler, unsigned int *seed, bool dynamic)
 {
         // tid_t tid = (tid_t)omp_get_thread_num();
         vid_t dst = WALKER_POS(walker);
@@ -91,12 +91,12 @@ void randomwalk_t::update_walk<empty_data_t, FirstOrder>(const walker_t<empty_da
             if (run_block->weights == NULL)
             {
                 walk_context<UNBAISEDCONTEXT> ctx(dst, walk_manager->nvertices, run_block->csr + adj_head, run_block->csr + adj_tail, seed, _conf.teleport);
-                dst = vertex_sample(ctx, sampler);
+                dst = vertex_sample(ctx, sampler, nullptr, dynamic);
             }
             else
             {
                 walk_context<BIASEDCONTEXT> ctx(dst, walk_manager->nvertices, run_block->csr + adj_head, run_block->csr + adj_tail, seed, run_block->weights + adj_head, run_block->weights + adj_tail, _conf.teleport);
-                dst = vertex_sample(ctx, sampler);
+                dst = vertex_sample(ctx, sampler, nullptr, dynamic);
             }
             hop--;
         }

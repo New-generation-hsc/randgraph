@@ -105,10 +105,12 @@ public:
         std::cout << "metrics report" << std::endl;
         for(const auto & entry : entrics) {
             double max_value = std::numeric_limits<double>::min(), min_value = std::numeric_limits<double>::max(), sum_value = 0.0;
+            double total_sum_value = std::numeric_limits<double>::min();
             size_t cnt = 0, total_count = 0;
             for(auto& metric : metrics) {
                 max_value = std::max(max_value, metric[entry].max_value);
                 min_value = std::min(min_value, metric[entry].min_value);
+                total_sum_value = std::max(total_sum_value, metric[entry].sum_value);
                 total_count += metric[entry].count;
                 auto q = metric[entry].q;
                 while(!q.empty()) {
@@ -117,7 +119,7 @@ public:
                     cnt++;
                 }
             }
-            std::cout << entry << " time elapased count : " << total_count << ", max value : " << max_value << ", min value : " << min_value << ", average time : " << sum_value / cnt << std::endl;
+            std::cout << entry << " time elapased count : " << total_count << ", max value : " << max_value << ", min value : " << min_value << ", average time : " << sum_value / cnt << ", total max sum value : " << total_sum_value << std::endl;
         }
         std::cout << "=================================================="<< std::endl;
     }

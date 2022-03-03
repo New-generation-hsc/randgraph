@@ -3,11 +3,13 @@
 
 #include <omp.h>
 #include <unordered_set>
+#include <functional>
 #include "api/types.hpp"
 #include "engine/walk.hpp"
 #include "engine/sample.hpp"
 #include "engine/context.hpp"
 #include "util/timer.hpp"
+#include "util/hash.hpp"
 
 template <>
 inline vid_t get_vertex_from_walk<vid_t>(const vid_t &data)
@@ -19,6 +21,7 @@ struct second_order_conf_t {
     wid_t walkpersource;
     hid_t hops;
     second_order_param_t param;
+    second_order_func_t func_param;
 };
 
 class second_order_app_t
@@ -27,14 +30,16 @@ private:
     wid_t _walkpersource;
     hid_t _hops;
     second_order_param_t param;
+    second_order_func_t func_param;
     walk_timer wtimer;
 
 public:
-    second_order_app_t(wid_t nwalks, hid_t steps, second_order_param_t app_param)
+    second_order_app_t(wid_t nwalks, hid_t steps, second_order_param_t app_param, second_order_func_t app_func)
     {
         _walkpersource = nwalks;
         _hops = steps;
         param = app_param;
+        func_param = app_func;
     }
 
     template <typename AppConfig>
@@ -45,6 +50,7 @@ public:
         _walkpersource = conf.walkpersource;
         _hops = conf.hops;
         param = conf.param;
+        func_param = conf.func_param;
     }
 
     template <typename walk_data_t, WalkType walk_type>
@@ -53,7 +59,7 @@ public:
     }
 
     template <typename walk_data_t, WalkType walk_type>
-    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler, unsigned int *seed)
+    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler, unsigned int *seed, bool dynamic)
     {
         logstream(LOG_ERROR) << "you are using a generic method." << std::endl;
     }
@@ -77,8 +83,17 @@ void second_order_app_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOr
     wtimer.register_entry("its_sample_query_neighbors");
     wtimer.register_entry("its_sample_select_neighbor");
     wtimer.register_entry("opt_alias_its_sample_select_neighbor");
+    wtimer.register_entry("reject_sample");
+    wtimer.register_entry("its_sample_make_cdf");
+    wtimer.register_entry("its_sample_vertex");
+    wtimer.register_entry("its_sample_initialization");
+    wtimer.register_entry("its_sample_generation");
+    wtimer.register_entry("alias_sample_initialization");
+    wtimer.register_entry("alias_sample_generation");
+    wtimer.register_entry("reject_sample_initialization");
+    wtimer.register_entry("reject_sample_generation");
 
-    #pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
     for (vid_t vertex = 0; vertex < walk_manager->nvertices; vertex++)
     {
         wid_t idx = vertex * this->_walkpersource;
@@ -101,7 +116,7 @@ void second_order_app_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOr
 }
 
 template <>
-void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &walker, graph_cache *cache, graph_walk<vid_t, SecondOrder> *walk_manager, sample_policy_t *sampler, unsigned int *seed)
+void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &walker, graph_cache *cache, graph_walk<vid_t, SecondOrder> *walk_manager, sample_policy_t *sampler, unsigned int *seed, bool dynamic)
 {
     vid_t cur_vertex = WALKER_POS(walker), prev_vertex = get_vertex_from_walk(walker.data);
     hid_t hop = WALKER_HOP(walker);
@@ -126,9 +141,11 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
         wtimer.start_time("vertex_sample");
         if (cur_block->weights == nullptr && cur_block->acc_weights == nullptr)
         {
+            BloomFilter *bf = prev_block->bf;
+            if(!walk_manager->load_bf) bf = nullptr;
             walk_context<SECONDORDERCTX> ctx(param, cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
-                                                    seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail);
-            next_vertex = vertex_sample(ctx, sampler, &wtimer);
+                                                    seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail, func_param, bf);
+            next_vertex = vertex_sample(ctx, sampler, &wtimer, dynamic);
         }
         else
         {
@@ -137,21 +154,21 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
                 walk_context<BIASEDACCSECONDORDERCTX> ctx(param, cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
                                                           seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail,
                                                           cur_block->acc_weights + adj_head, cur_block->acc_weights + adj_tail, prev_block->acc_weights + prev_adj_head, prev_block->acc_weights + prev_adj_tail, cur_block->prob, cur_block->alias);
-                next_vertex = vertex_sample(ctx, sampler, &wtimer);
+                next_vertex = vertex_sample(ctx, sampler, &wtimer, dynamic);
             }
             else if (sampler->use_acc_weight)
             {
                 walk_context<BIASEDACCSECONDORDERCTX> ctx(param, cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
                                                           seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail,
                                                           cur_block->acc_weights + adj_head, cur_block->acc_weights + adj_tail, prev_block->acc_weights + prev_adj_head, prev_block->acc_weights + prev_adj_tail);
-                next_vertex = vertex_sample(ctx, sampler, &wtimer);
+                next_vertex = vertex_sample(ctx, sampler, &wtimer, dynamic);
             }
             else
             {
                 walk_context<BIASEDSECONDORDERCTX> ctx(param, cur_vertex, walk_manager->nvertices, cur_block->csr + adj_head, cur_block->csr + adj_tail,
                                                        seed, prev_vertex, prev_block->csr + prev_adj_head, prev_block->csr + prev_adj_tail,
                                                        cur_block->weights + adj_head, cur_block->weights + adj_tail, prev_block->weights + prev_adj_head, prev_block->weights + prev_adj_tail);
-                next_vertex = vertex_sample(ctx, sampler, &wtimer);
+                next_vertex = vertex_sample(ctx, sampler, &wtimer, dynamic);
             }
         }
         wtimer.stop_time("vertex_sample");

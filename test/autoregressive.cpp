@@ -14,6 +14,7 @@
 #include "metrics/reporter.hpp"
 #include "apps/secondorder.hpp"
 
+
 int main(int argc, const char *argv[])
 {
     assert(argc >= 2);
@@ -26,6 +27,9 @@ int main(int argc, const char *argv[])
     vid_t nvertices;
     eid_t nedges;
     bool weighted = get_option_bool("weighted");
+    bool reordered = get_option_bool("reordered");
+    bool filter = get_option_bool("filter");
+    bool dynamic = get_option_bool("dynamic");
     load_graph_meta(base_name, &nvertices, &nedges, weighted);
 
     graph_config conf = {
@@ -35,22 +39,50 @@ int main(int argc, const char *argv[])
         (tid_t)omp_get_max_threads(),
         nvertices,
         nedges,
-        weighted
+        weighted,
+        reordered,
+        filter,
+        dynamic
     };
 
     graph_block blocks(&conf);
     metrics m("autoregressive");
     graph_driver driver(&conf, m);
 
-    graph_walk<vid_t, SecondOrder> walk_mangager(conf.base_name, conf.nvertices, conf.nthreads, driver, blocks);
+    graph_walk<vid_t, SecondOrder> walk_mangager(conf, driver, blocks);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
-    wid_t walks = (wid_t)get_option_int("walks", 100000);
+    wid_t walks = (wid_t)get_option_int("walkpersource", 100000);
     hid_t steps = (hid_t)get_option_int("length", 25);
     real_t alpha = (real_t)get_option_float("alpha", 0.2);
-    graph_cache cache(min_value(nmblocks, blocks.nblocks), conf.blocksize);
+    graph_cache cache(min_value(nmblocks, blocks.nblocks), &conf);
 
     second_order_param_t app_param = { alpha, (real_t)(1.0 - alpha), (real_t)(1.0 - alpha), (real_t)(1.0 - alpha)};
     second_order_conf_t app_conf = {walks, steps, app_param};
+
+    second_order_func_t app_func;
+    app_func.query_equal_func = [&alpha](const vertex_t& prev_vertex, const vertex_t& cur_vertex) {
+        vid_t max_degree = std::max(prev_vertex.degree, cur_vertex.degree);
+        return (1.0 - alpha) * max_degree / cur_vertex.degree;
+    };
+    app_func.query_comm_neighbor_func = [&alpha](const vertex_t& prev_vertex, const vertex_t& cur_vertex) {
+        vid_t max_degree = std::max(prev_vertex.degree, cur_vertex.degree);
+        return (1.0 - alpha) * max_degree / cur_vertex.degree +  alpha * max_degree / prev_vertex.degree;
+    };
+    app_func.query_other_vertex_func = [&alpha](const vertex_t& prev_vertex, const vertex_t& cur_vertex) {
+        vid_t max_degree = std::max(prev_vertex.degree, cur_vertex.degree);
+        return (1.0 - alpha) * max_degree / cur_vertex.degree;
+    };
+    app_func.query_upper_bound_func = [&alpha](const vertex_t& prev_vertex, const vertex_t& cur_vertex) {
+        vid_t max_degree = std::max(prev_vertex.degree, cur_vertex.degree);
+        if(prev_vertex.degree > 0) return (1.0 - alpha) * max_degree / cur_vertex.degree +  alpha * max_degree / prev_vertex.degree;
+        else return (1.0 - alpha) * max_degree / cur_vertex.degree;
+    };
+    app_func.query_lower_bound_func = [&alpha](const vertex_t& prev_vertex, const vertex_t& cur_vertex) {
+        vid_t max_degree = std::max(prev_vertex.degree, cur_vertex.degree);
+        return (1.0 - alpha) * max_degree / cur_vertex.degree;
+    };
+    app_conf.func_param = app_func;
+
     userprogram_t<second_order_app_t, second_order_conf_t> userprogram(app_conf);
     graph_engine<vid_t, SecondOrder> engine(cache, walk_mangager, driver, conf, m);
 
@@ -79,14 +111,15 @@ int main(int argc, const char *argv[])
 
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
-    scheduler<second_order_scheduler_t> walk_scheduler(m);
-    its_sample_t acc_its_sampler(true);
-    complex_sample_context_t sample_context(sampler, &acc_its_sampler);
+    scheduler<surfer_scheduler_t> walk_scheduler(m);
+    // complex_sample_context_t sample_context(sampler, &its_sampler);
+    naive_sample_context_t sample_context(sampler);
 
     engine.prologue(userprogram);
     engine.run(userprogram, &walk_scheduler, &sample_context);
     engine.epilogue(userprogram);
 
+    sampler->report();
     metrics_report(m);
 
     return 0;

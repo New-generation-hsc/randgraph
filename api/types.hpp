@@ -2,6 +2,7 @@
 #define _GRAPH_TYPES_H_
 
 #include <stdint.h>
+#include <functional>
 
 typedef uint32_t vid_t;   /* vertex id */
 typedef uint64_t eid_t;   /* edge id */
@@ -28,6 +29,8 @@ typedef float    real_t;     /* edge weight */
 #define WALK_MAKEUP(source, pos, hop) ((((walk_t)source & ((0x1 << SOURCESIZE) - 1)) << SOURCESHIFT) | (((walk_t)pos & ((0x1 << POSIZE) - 1)) << POSHIFT) | ((walk_t)hop & ((0x1 << HOPSIZE) - 1)))
 
 enum WalkType { FirstOrder, SecondOrder };
+
+struct vertex_t { vid_t vertex, degree; };
 
 struct empty_data_t
 {
@@ -84,6 +87,24 @@ inline vid_t get_vertex_from_walk(const walk_data_t& data) {
 
 struct second_order_param_t {
     real_t alpha, beta, gamma, delta;
+};
+
+struct second_order_func_t
+{
+    std::function<real_t(const vertex_t &prev_vertex, const vertex_t& cur_vertex)> query_equal_func;
+    std::function<real_t(const vertex_t &prev_vertex, const vertex_t& cur_vertex)> query_comm_neighbor_func;
+    std::function<real_t(const vertex_t &prev_vertex, const vertex_t& cur_vertex)> query_other_vertex_func;
+    std::function<real_t(const vertex_t &prev_vertex, const vertex_t& cur_vertex)> query_upper_bound_func;
+    std::function<real_t(const vertex_t &prev_vertex, const vertex_t& cur_vertex)> query_lower_bound_func;
+
+    second_order_func_t()
+    {
+        query_equal_func = nullptr;
+        query_comm_neighbor_func = nullptr;
+        query_other_vertex_func = nullptr;
+        query_upper_bound_func = nullptr;
+        query_lower_bound_func = nullptr;
+    }
 };
 
 #endif

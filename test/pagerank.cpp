@@ -40,7 +40,7 @@ int main(int argc, const char* argv[]) {
     metrics m("pagerank");
     graph_driver driver(&conf, m);
 
-    graph_walk<empty_data_t, FirstOrder> walk_mangager(conf.base_name, conf.nvertices, conf.nthreads, driver, blocks);
+    graph_walk<empty_data_t, FirstOrder> walk_mangager(conf, driver, blocks);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
     vid_t firstsource = (vid_t)get_option_int("firstsource", 10009);
     // vid_t numsources = (vid_t)get_option_int("numsources", 4847571);
@@ -48,7 +48,7 @@ int main(int argc, const char* argv[]) {
     // wid_t walkpersource = (wid_t)get_option_int("walkpersource", 1);
     wid_t walkpersource = (wid_t)get_option_int("walkpersource", 1000000);
     hid_t steps = (hid_t)get_option_int("length", 6);
-    graph_cache cache(min_value(nmblocks, blocks.nblocks), conf.blocksize);
+    graph_cache cache(min_value(nmblocks, blocks.nblocks), &conf);
 
     pagerank_conf_t app_conf = { firstsource, numsources, walkpersource, steps, 0.0 };
     userprogram_t<pagerank_t, pagerank_conf_t> userprogram(app_conf);

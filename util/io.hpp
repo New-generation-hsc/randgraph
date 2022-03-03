@@ -68,5 +68,13 @@ void dump_block_range(int fd, T *buf, size_t count, off_t off) {
     }
 }
 
+template<typename T>
+void appendfile(std::string filename, T *array, size_t bsize) {
+    int fd = open(filename.c_str(), O_RDWR | O_APPEND | O_CREAT, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
+    assert(fd >= 0);
+    // pwrite(fd, (char*)array, bsize * sizeof(T), 0);
+    dump_block_range(fd, array, bsize, 0);
+    close(fd);
+}
 
 #endif

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include "api/types.hpp"
 #include "logger/logger.hpp"
+#include "util/hash.hpp"
 
 enum CtxType
 {
@@ -79,50 +80,111 @@ public:
     vid_t prev_vertex;
     vid_t *prev_adj_start, *prev_adj_end;
     std::unordered_set<vid_t> prev_neighbors;
+    BloomFilter *bf;
+    real_t w_equal, w_comm, w_other, w_max, w_min;
 
     walk_context(second_order_param_t param, vid_t vertex, vid_t num_vertices, vid_t *start, vid_t *end, unsigned *seed,
-                 vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e) : context(vertex, num_vertices, start, end, seed)
+                 vid_t prev, vid_t *p_adj_s, vid_t *p_adj_e, second_order_func_t app_func, BloomFilter *filter = nullptr) : context(vertex, num_vertices, start, end, seed)
     {
         this->app_param = param;
         this->prev_vertex = prev;
         this->prev_adj_start = p_adj_s;
         this->prev_adj_end = p_adj_e;
-        prev_neighbors = std::unordered_set<vid_t>(prev_adj_start, prev_adj_end);
+        this->bf = filter;
+        vertex_t c_vertex = { vertex, static_cast<vid_t>(end - start) };
+        vertex_t p_vertex = { prev, static_cast<vid_t>(p_adj_e - p_adj_s) };
+        this->w_equal = app_func.query_equal_func(p_vertex, c_vertex);
+        this->w_comm = app_func.query_comm_neighbor_func(p_vertex, c_vertex);
+        this->w_other = app_func.query_other_vertex_func(p_vertex, c_vertex);
+        this->w_max = app_func.query_upper_bound_func(p_vertex, c_vertex);
+        this->w_min = app_func.query_lower_bound_func(p_vertex, c_vertex);
     }
 
-    void query_neigbors_weight(std::vector<real_t> &adj_weights) const
+    void query_neigbors_weight(std::vector<real_t> &adj_weights)
     {
         size_t deg = static_cast<size_t>(adj_end - adj_start);
         adj_weights.resize(deg);
+        prev_neighbors = std::unordered_set<vid_t>(prev_adj_start, prev_adj_end);
         for(size_t index = 0; index < deg; ++index) {
             if(*(adj_start + index) == prev_vertex) {
-                adj_weights[index] = app_param.gamma;
+                // adj_weights[index] = app_param.gamma;
+                adj_weights[index] = this->w_equal;
             }else if(prev_neighbors.find(*(adj_start + index)) != prev_neighbors.end()) {
-                adj_weights[index] = app_param.alpha + app_param.beta;
+                // adj_weights[index] = app_param.alpha + app_param.beta;
+                adj_weights[index] = this->w_comm;
             }else {
-                adj_weights[index] = app_param.delta;
+                // adj_weights[index] = app_param.delta;
+                adj_weights[index] = this->w_other;
             }
         }
     }
 
-    real_t query_max_weight() const {
-        return std::max(app_param.gamma, std::max(app_param.alpha + app_param.beta, app_param.delta));
-    }
-
-    real_t query_vertex_weight(size_t index) const {
-        if(*(adj_start + index) == prev_vertex) {
-            return app_param.gamma;
-        }else if(prev_neighbors.find(*(adj_start + index)) != prev_neighbors.end()) {
-            return app_param.alpha + app_param.beta;
-        }else {
-            return app_param.delta;
+    void query_neighbors_cdf(std::vector<real_t> &adj_weights)
+    {
+        size_t deg = static_cast<size_t>(adj_end - adj_start), prev_deg = static_cast<size_t>(prev_adj_end - prev_adj_start);
+        size_t pos = 0;
+        for(size_t index = 0; index < deg; ++index) {
+            if(adj_start[index] == prev_vertex) adj_weights[index+1] = adj_weights[index] + this->w_equal;
+            else {
+                while(pos < prev_deg && adj_start[index] > prev_adj_start[pos]) pos++;
+                if(pos < prev_deg && adj_start[index] == prev_adj_start[pos]) {
+                    adj_weights[index+1] = adj_weights[index] + this->w_comm;
+                    pos++;
+                }else {
+                    adj_weights[index+1] = adj_weights[index] + this->w_other;
+                }
+            }
         }
     }
 
-    void query_comm_neigbors_weight(std::vector<real_t> &adj_weights, std::vector<vid_t> &comm_neighbors, real_t &total_weight) const
+    real_t query_max_weight() {
+        // if(cur_vertex == prev_vertex) return app_param.alpha + app_param.beta;
+        // return std::max(app_param.gamma, std::max(app_param.alpha + app_param.beta, app_param.delta));
+        if(cur_vertex == prev_vertex) return this->w_equal;
+        return this->w_max;
+    }
+
+    real_t query_min_weight() { return this->w_min; }
+
+    real_t query_vertex_weight(size_t index) {
+        // if(*(adj_start + index) == prev_vertex) {
+        //     return app_param.gamma;
+        // }else if(prev_neighbors.find(*(adj_start + index)) != prev_neighbors.end()) {
+        //     return app_param.alpha + app_param.beta;
+        // }else {
+        //     return app_param.delta;
+        // }
+
+        vid_t next_vertex = *(adj_start + index);
+        // if(next_vertex == prev_vertex) return app_param.gamma;
+        if(next_vertex == prev_vertex) return this->w_equal;
+
+        if(bf && !bf->exist(prev_vertex, next_vertex)) {
+            // return app_param.delta;
+            return this->w_other;
+        }
+
+        // if(prev_neighbors.empty()) {
+        //     prev_neighbors = std::unordered_set<vid_t>(prev_adj_start, prev_adj_end);
+        // }
+
+        // if(prev_neighbors.find(next_vertex) != prev_neighbors.end()) {
+        //     return app_param.alpha + app_param.beta;
+        // }else {
+        //     return app_param.delta;
+        // }
+        bool exist = std::binary_search(prev_adj_start, prev_adj_end, next_vertex);
+        // if(exist) return app_param.alpha + app_param.beta;
+        // else return app_param.delta;
+        if(exist) return this->w_comm;
+        else return this->w_other;
+    }
+
+    void query_comm_neigbors_weight(std::vector<real_t> &adj_weights, std::vector<vid_t> &comm_neighbors, real_t &total_weight)
     {
         size_t deg = static_cast<size_t>(adj_end - adj_start);
         real_t comm_weight_sum = 0;
+        prev_neighbors = std::unordered_set<vid_t>(prev_adj_start, prev_adj_end);
         for (size_t index = 0; index < deg; ++index)
         {
             if (*(adj_start + index) == prev_vertex)
@@ -141,7 +203,7 @@ public:
         total_weight = comm_weight_sum + (deg - comm_neighbors.size()) * app_param.delta;
     }
 
-    real_t query_pivot_weight(const std::vector<real_t> &adj_weights, const std::vector<vid_t> &comm_neighbors, eid_t pivot) const
+    real_t query_pivot_weight(const std::vector<real_t> &adj_weights, const std::vector<vid_t> &comm_neighbors, eid_t pivot)
     {
         size_t pos = std::upper_bound(comm_neighbors.begin(), comm_neighbors.end(), *(adj_start + pivot)) - comm_neighbors.begin();
         real_t pivot_weight = 0.0;

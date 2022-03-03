@@ -24,7 +24,9 @@ sudo sync; sudo sh -c '/usr/bin/echo 1 > /proc/sys/vm/drop_caches'
 
 # ./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample opt_alias weighted length 25 walkpersource 1
 
-./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample reject length 2 walkpersource 1 reordered
+./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample its length 2 walkpersource 1
+
+# ./bin/test/autoregressive $DATASET nmblocks $NMBLOCKS sample its length 25 walkpersource 1
 
 # ./bin/test/pagerank $DATASET nmblocks $NMBLOCKS sample naive
 
