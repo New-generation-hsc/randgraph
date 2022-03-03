@@ -84,8 +84,8 @@ void second_order_app_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOr
     wtimer.register_entry("its_sample_select_neighbor");
     wtimer.register_entry("opt_alias_its_sample_select_neighbor");
     wtimer.register_entry("reject_sample");
-    wtimer.register_entry("its_sample_query_neighbors");
-    wtimer.register_entry("its_sample_select_neighbor");
+    wtimer.register_entry("its_sample_make_cdf");
+    wtimer.register_entry("its_sample_vertex");
 
     #pragma omp parallel for schedule(static)
     for (vid_t vertex = 0; vertex < walk_manager->nvertices; vertex++)

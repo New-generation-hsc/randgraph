@@ -119,6 +119,24 @@ public:
         }
     }
 
+    void query_neighbors_cdf(std::vector<real_t> &adj_weights)
+    {
+        size_t deg = static_cast<size_t>(adj_end - adj_start), prev_deg = static_cast<size_t>(prev_adj_end - prev_adj_start);
+        size_t pos = 0;
+        for(size_t index = 0; index < deg; ++index) {
+            if(adj_start[index] == prev_vertex) adj_weights[index+1] = adj_weights[index] + this->w_equal;
+            else {
+                while(pos < prev_deg && adj_start[index] > prev_adj_start[pos]) pos++;
+                if(pos < prev_deg && adj_start[index] == prev_adj_start[pos]) {
+                    adj_weights[index+1] = adj_weights[index] + this->w_comm;
+                    pos++;
+                }else {
+                    adj_weights[index+1] = adj_weights[index] + this->w_other;
+                }
+            }
+        }
+    }
+
     real_t query_max_weight() {
         // if(cur_vertex == prev_vertex) return app_param.alpha + app_param.beta;
         // return std::max(app_param.gamma, std::max(app_param.alpha + app_param.beta, app_param.delta));

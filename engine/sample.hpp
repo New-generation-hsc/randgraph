@@ -262,14 +262,30 @@ public:
         size_t off = its_sample_impl(ctx.weight_start, ctx.weight_end, ctx.local_seed);
         return ctx.adj_start[off];
     }
+    // virtual vid_t sample(walk_context<SECONDORDERCTX> &ctx, walk_timer* wtimer)
+    // {
+    //     wtimer->start_time("its_sample_make_cdf");
+    //     size_t n = static_cast<size_t>(ctx.adj_end - ctx.adj_start);
+    //     std::vector<real_t> adj_weights(n + 1, 0.0);
+    //     for(size_t index = 0; index < n; index++) {
+    //         adj_weights[index+1] = adj_weights[index] + ctx.query_vertex_weight(index);
+    //     }
+    //     wtimer->stop_time("its_sample_make_cdf");
+    //     wtimer->start_time("its_sample_vertex");
+    //     real_t rand_val = adj_weights[n] * (real_t)rand_r(ctx.local_seed) / (real_t)RAND_MAX;
+    //     size_t pos = std::upper_bound(adj_weights.begin(), adj_weights.end(), rand_val) - adj_weights.begin();
+    //     wtimer->stop_time("its_sample_vertex");
+    //     return ctx.adj_start[pos - 1];
+    // }
     virtual vid_t sample(walk_context<SECONDORDERCTX> &ctx, walk_timer* wtimer)
     {
         wtimer->start_time("its_sample_make_cdf");
         size_t n = static_cast<size_t>(ctx.adj_end - ctx.adj_start);
         std::vector<real_t> adj_weights(n + 1, 0.0);
-        for(size_t index = 0; index < n; index++) {
-            adj_weights[index+1] = adj_weights[index] + ctx.query_vertex_weight(index);
-        }
+        // for(size_t index = 0; index < n; index++) {
+        //     adj_weights[index+1] = adj_weights[index] + ctx.query_vertex_weight(index);
+        // }
+        ctx.query_neighbors_cdf(adj_weights);
         wtimer->stop_time("its_sample_make_cdf");
         wtimer->start_time("its_sample_vertex");
         real_t rand_val = adj_weights[n] * (real_t)rand_r(ctx.local_seed) / (real_t)RAND_MAX;
