@@ -6,6 +6,8 @@
 #include "api/graph_buffer.hpp"
 #include "util/hash.hpp"
 #include "cache.hpp"
+#include "metrics/metrics.hpp"
+#include "util/timer.hpp"
 
 class block_desc_manager_t {
 private:
@@ -47,8 +49,11 @@ public:
 
     bool load_bf;
 
+    metrics *_m;
+    walk_timer mg_timer;
+
     // BloomFilter *bf;
-    graph_walk(graph_config& conf, graph_driver& driver, graph_block &blocks) {
+    graph_walk(graph_config& conf, graph_driver& driver, graph_block &blocks, metrics *m) {
         base_name = conf.base_name;
         nvertices = conf.nvertices;
         nthreads = conf.nthreads;
@@ -98,6 +103,8 @@ public:
         //     bf->load_bloom_filter(filter_name);
         // }
         load_bf = conf.filter;
+        _m = m;
+        mg_timer.register_entry("persistent_walks");
     }
 
     ~graph_walk()
@@ -137,10 +144,12 @@ public:
 
     void persistent_walks(bid_t blk, tid_t t)
     {
+        mg_timer.start_time("persistent_walks");
         block_ndwalk[blk][t] += block_walks[blk][t].size();
         block_nmwalk[blk][t] -= block_walks[blk][t].size();
         appendfile(get_walk_name(base_name, blk), block_walks[blk][t].buffer_begin(), block_walks[blk][t].size());
         block_walks[blk][t].clear();
+        mg_timer.stop_time("persistent_walks");
     }
 
     wid_t nblockwalks(bid_t blk)

@@ -1,8 +1,8 @@
 #!/bin/bash
 
-DATASET="/home/hsc/dataset/twitter/twitter_rv.net"
+# DATASET="/home/hsc/dataset/twitter/twitter_rv.net"
 # DATASET="/home/hsc/dataset/twitter/w-twitter_rv.net"
-# DATASET="/home/hsc/dataset/livejournal/soc-LiveJournal1.txt"
+DATASET="/home/hsc/dataset/livejournal/soc-LiveJournal1.txt"
 # DATASET="/home/hsc/dataset/livejournal/w-soc-livejournal.txt"
 VERTICES=61578415
 STEPS=100
@@ -24,7 +24,7 @@ sudo sync; sudo sh -c '/usr/bin/echo 1 > /proc/sys/vm/drop_caches'
 
 # ./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample opt_alias weighted length 25 walkpersource 1
 
-./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample its length 2 walkpersource 1
+./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample its length 1 walkpersource 1
 
 # ./bin/test/autoregressive $DATASET nmblocks $NMBLOCKS sample its length 25 walkpersource 1
 

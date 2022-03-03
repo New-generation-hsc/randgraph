@@ -40,7 +40,7 @@ int main(int argc, const char* argv[]) {
     metrics m("randomwalk");
     graph_driver driver(&conf, m);
 
-    graph_walk<empty_data_t, FirstOrder> walk_mangager(conf, driver, blocks);
+    graph_walk<empty_data_t, FirstOrder> walk_mangager(conf, driver, blocks, &m);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
     wid_t walks = (wid_t)get_option_int("walks", 100000);
     hid_t steps = (hid_t)get_option_int("length", 25);

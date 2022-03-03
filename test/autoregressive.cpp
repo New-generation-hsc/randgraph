@@ -49,7 +49,7 @@ int main(int argc, const char *argv[])
     metrics m("autoregressive");
     graph_driver driver(&conf, m);
 
-    graph_walk<vid_t, SecondOrder> walk_mangager(conf, driver, blocks);
+    graph_walk<vid_t, SecondOrder> walk_mangager(conf, driver, blocks, &m);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
     wid_t walks = (wid_t)get_option_int("walkpersource", 100000);
     hid_t steps = (hid_t)get_option_int("length", 25);

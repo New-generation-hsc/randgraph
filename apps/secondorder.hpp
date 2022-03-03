@@ -66,7 +66,7 @@ public:
 
     void epilogue()
     {
-        wtimer.report();
+        wtimer.report("out/app_metrics.txt");
     }
 
     wid_t get_numsources() { return _walkpersource; }

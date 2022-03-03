@@ -103,6 +103,7 @@ public:
     void epilogue(userprogram_t<AppType, AppConfig> &userprogram)
     {
         userprogram.epilogue();
+        walk_manager->mg_timer.report("out/walk_metric.txt");
         logstream(LOG_INFO) << "  ================= FINISHED ======================  " << std::endl;
     }
 

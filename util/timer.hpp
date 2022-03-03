@@ -10,6 +10,7 @@
 #include <chrono>
 #include <functional>
 #include <iostream>
+#include <fstream>
 #include <algorithm>
 #include <set>
 #include "api/types.hpp"
@@ -100,8 +101,13 @@ public:
         metrics[tid][stringval].stop_time();
     }
 
-    void report() {
+    void report(const char* output = nullptr) {
         std::cout << "=================================================="<< std::endl;
+        std::ofstream file;
+        if(output) {
+            file.open(output, std::ios::out | std::ios::trunc);
+            file << "metrics report" << std::endl;
+        }
         std::cout << "metrics report" << std::endl;
         for(const auto & entry : entrics) {
             double max_value = std::numeric_limits<double>::min(), min_value = std::numeric_limits<double>::max(), sum_value = 0.0;
@@ -120,6 +126,16 @@ public:
                 }
             }
             std::cout << entry << " time elapased count : " << total_count << ", max value : " << max_value << ", min value : " << min_value << ", average time : " << sum_value / cnt << ", total max sum value : " << total_sum_value << std::endl;
+            if(output && cnt > 0) {
+                file << "." << entry << ".count = " << total_count << std::endl;
+                file << "." << entry << ".max_value = " << max_value << std::endl;
+                file << "." << entry << ".min_value = " << min_value << std::endl;
+                file << "." << entry << ".average_time = " << sum_value / cnt << std::endl;
+                file << "." << entry << ".total_max_sum_value = " << total_sum_value << std::endl;
+            }
+        }
+        if(output) {
+            file.close();
         }
         std::cout << "=================================================="<< std::endl;
     }
