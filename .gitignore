@@ -5,3 +5,4 @@ bin/test/*
 randgraph_metrics.txt
 *.log
 tags
+out/*
