@@ -101,6 +101,10 @@ public:
             load_block_range(filter_desc, cache.cache_blocks[cache_index].bf->data(), bf_sz, block_index * tb_sz);
             _m.stop_time("load_block_filter_info");
         }
+
+#ifdef PROF_METRIC
+        cache.cache_blocks[cache_index].block->update_loaded_count();
+#endif
         _m.stop_time("load_block_info");
     }
 

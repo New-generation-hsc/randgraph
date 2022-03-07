@@ -41,12 +41,20 @@ public:
     rank_t rank;                        /* record the block rank */
     std::shared_ptr<std::mutex> mtx;    /* mutex for safe update the rank */
 
+#ifdef PROF_METRIC
+    size_t loaded_count;
+#endif
+
     block_t() {
         blk = cache_index = 0;
         start_vert = nverts = 0;
         start_edge = nedges = 0;
         status  = INACTIVE;
         mtx = std::make_shared<std::mutex>();
+
+#ifdef PROF_METRIC
+        loaded_count = 0;
+#endif
     }
 
     block_t& operator=(const block_t& other) {
@@ -61,6 +69,10 @@ public:
         }
         return *this;
     }
+
+#ifdef PROF_METRIC
+    void update_loaded_count() { loaded_count += 1; };
+#endif
 };
 
 class cache_block {
@@ -184,6 +196,13 @@ public:
         return nblocks;
     }
 
+#ifdef PROF_METRIC
+    void report() {
+        for(bid_t blk = 0; blk < nblocks; blk++) {
+            logstream(LOG_INFO) << "blk [ " << blk << " ] : loaded count = [ " << blocks[blk].loaded_count << " ]" << std::endl;
+        }
+    }
+#endif
 };
 
 class graph_cache {

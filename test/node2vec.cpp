@@ -102,6 +102,10 @@ int main(int argc, const char *argv[])
     engine.run(userprogram, &walk_scheduler, &sample_context);
     engine.epilogue(userprogram);
 
+#ifdef PROF_METRIC
+    blocks.report();
+#endif
+
     sampler->report();
     metrics_report(m);
 
