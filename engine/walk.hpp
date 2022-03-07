@@ -410,8 +410,13 @@ struct block_walks_impl_t<SecondOrder> {
                bid_t blk = cache.cache_blocks[index].block->blk;
                wid_t walk_cnt = walk_manager.nblockwalks(blk * nblocks + exec_block);
                if(walk_cnt > 0) {
-                   active_cache_blocks.push_back(blk);
+                   active_cache_blocks.push_back(blk * nblocks + exec_block);
                    total_walks += walk_cnt;
+               }
+
+               if(blk != exec_block && (walk_cnt = walk_manager.nblockwalks(exec_block * nblocks + blk)) > 0) {
+                    active_cache_blocks.push_back(exec_block * nblocks + blk);
+                    total_walks += walk_cnt;
                }
             }
         }
@@ -429,7 +434,7 @@ struct block_walks_impl_t<SecondOrder> {
     template<typename walk_data_t>
     size_t load_walks(graph_walk<walk_data_t, SecondOrder> &walk_manager, bid_t exec_block) {
         size_t nwalks = 0;
-        bid_t select_block = active_cache_blocks[idx] * walk_manager.global_blocks->nblocks + exec_block;
+        bid_t select_block = active_cache_blocks[idx];
         if(!queried) {
             query_interval_block_state(walk_manager, select_block);
         }
@@ -437,14 +442,14 @@ struct block_walks_impl_t<SecondOrder> {
         if(state.num_mem_walks > 0) {
             nwalks = walk_manager.load_memory_walks(select_block);
             state.num_mem_walks = 0;
-            logstream(LOG_DEBUG) << "load memory walks from " << active_cache_blocks[idx] << " to " << exec_block << ", walks = " << nwalks << std::endl;
+            logstream(LOG_DEBUG) << "load memory walks from " << select_block / walk_manager.nblocks << " to " << select_block % walk_manager.nblocks << ", walks = " << nwalks << std::endl;
         } else if(state.num_disk_walks > 0) {
             wid_t interval_max_walks = 32 * MAX_TWALKS;
             wid_t interval_walks = std::min(state.num_disk_walks, interval_max_walks);
             state.num_disk_walks -= interval_walks;
             nwalks = walk_manager.load_disk_walks(select_block, interval_walks, state.disk_load_walks);
             state.disk_load_walks += interval_walks;
-            logstream(LOG_DEBUG) << "load disk walks from " << active_cache_blocks[idx] << " to " << exec_block << ", walks = " << nwalks << std::endl;
+            logstream(LOG_DEBUG) << "load disk walks from " << select_block / walk_manager.nblocks << " to " << select_block % walk_manager.nblocks << ", walks = " << nwalks << std::endl;
         }
 
         if(state.num_disk_walks == 0) {
