@@ -71,10 +71,10 @@ int main(int argc, const char* argv[]) {
 
     scheduler<drunkardmob_scheduler> walk_scheduler(m);
     // scheduler<graph_scheduler<graph_config>, graph_config> graph_scheduler(conf, m);
-    naive_sample_context_t sample_context(sampler);
+    // naive_sample_context_t sample_context(sampler);
 
     engine.prologue(userprogram);
-    engine.run(userprogram, &walk_scheduler, &sample_context);
+    engine.run(userprogram, &walk_scheduler, sampler);
     engine.epilogue(userprogram);
 
     metrics_report(m);

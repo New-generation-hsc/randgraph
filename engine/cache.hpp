@@ -132,14 +132,37 @@ void swap(cache_block& cb1, cache_block& cb2) {
     eid_t *tbeg_pos = cb2.beg_pos;
     vid_t *tdegree  = cb2.degree;
     vid_t *tcsr     = cb2.csr;
+    real_t *tw      = cb2.weights;
+    real_t *tp      = cb2.prob;
+    vid_t *ta       = cb2.alias;
+    real_t *tacc    = cb2.acc_weights;
+    BloomFilter *tbf = cb2.bf;
+    bool tl         = cb2.loaded_alias;
+    int tlife       = cb2.life;
+
     cb2.block = cb1.block;
     cb2.beg_pos = cb1.beg_pos;
     cb2.degree = cb1.degree;
     cb2.csr = cb1.csr;
+    cb2.weights = cb1.weights;
+    cb2.prob    = cb1.prob;
+    cb2.alias   = cb1.alias;
+    cb2.acc_weights = cb1.acc_weights;
+    cb2.bf      = cb1.bf;
+    cb2.loaded_alias = cb1.loaded_alias;
+    cb2.life    = cb1.life;
+
     cb1.block = tblock;
     cb1.beg_pos = tbeg_pos;
     cb1.degree = tdegree;
     cb1.csr = tcsr;
+    cb1.weights = tw;
+    cb1.prob = tp;
+    cb1.alias = ta;
+    cb1.acc_weights = tacc;
+    cb1.bf = tbf;
+    cb1.loaded_alias = tl;
+    cb1.life = tlife;
 }
 
 class graph_block {
