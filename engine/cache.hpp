@@ -41,6 +41,8 @@ public:
     rank_t rank;                        /* record the block rank */
     std::shared_ptr<std::mutex> mtx;    /* mutex for safe update the rank */
 
+    real_t exp_walk_len;                /* expected walk length */
+
 #ifdef PROF_METRIC
     size_t loaded_count;
 #endif
@@ -173,9 +175,11 @@ public:
     graph_block(graph_config* conf) {
         std::string vert_block_name = get_vert_blocks_name(conf->base_name, conf->blocksize, conf->reordered);
         std::string edge_block_name = get_edge_blocks_name(conf->base_name, conf->blocksize, conf->reordered);
+        std::string walk_len_name   = get_expected_walk_length_name(conf->base_name, conf->fnum);
 
         std::vector<vid_t> vblocks = load_graph_blocks<vid_t>(vert_block_name);
         std::vector<eid_t> eblocks = load_graph_blocks<eid_t>(edge_block_name);
+        std::vector<real_t> wblocks = load_graph_blocks<real_t>(walk_len_name);
 
         nblocks = vblocks.size() - 1;
         blocks.resize(nblocks);
@@ -189,6 +193,7 @@ public:
             blocks[blk].nedges     = eblocks[blk+1] - eblocks[blk];
             blocks[blk].status     = INACTIVE;
             blocks[blk].rank       = 0;
+            blocks[blk].exp_walk_len = wblocks[blk];
 
             logstream(LOG_INFO) << "blk [ " << blk << " ] : vert = [ " << blocks[blk].start_vert << ", " << blocks[blk].start_vert + blocks[blk].nverts << " ], csr = [ ";
             logstream(LOG_INFO) << blocks[blk].start_edge << ", " << blocks[blk].start_edge + blocks[blk].nedges << " ]" << std::endl;

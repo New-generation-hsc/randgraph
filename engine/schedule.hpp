@@ -666,9 +666,9 @@ private:
             }
         }
 
-        auto cmp = [&partition_walks](bid_t u, bid_t v)
+        auto cmp = [&partition_walks, &walk_manager](bid_t u, bid_t v)
         {
-            return partition_walks[u] > partition_walks[v];
+            return (*walk_manager.global_blocks)[u].exp_walk_len * partition_walks[u] > (*walk_manager.global_blocks)[v].exp_walk_len * partition_walks[v];
         };
 
         std::vector<bid_t> block_indexs(nblocks, 0);
@@ -691,22 +691,34 @@ private:
         std::vector<bid_t> candidate_blocks(cache.ncblock);
         for (bid_t blk = 0; blk < cache.ncblock; blk++) candidate_blocks[blk] = block_indexs[blk];
 
-        auto cal_nwalks = [&block_walks, nblocks](const std::vector<bid_t>& blocks) {
-            wid_t nwalks = 0;
+        // auto cal_nwalks = [&block_walks, nblocks](const std::vector<bid_t>& blocks) {
+        //     wid_t nwalks = 0;
+        //     for(auto p_blk : blocks) {
+        //         for(auto c_blk : blocks) {
+        //             nwalks += block_walks[p_blk * nblocks + c_blk];
+        //         }
+        //     }
+        //     return nwalks;
+        // };
+
+        auto cal_score = [&block_walks, &walk_manager, nblocks](const std::vector<bid_t>& blocks) {
+            wid_t score = 0;
             for(auto p_blk : blocks) {
                 for(auto c_blk : blocks) {
-                    nwalks += block_walks[p_blk * nblocks + c_blk];
+                    score += (*walk_manager.global_blocks)[c_blk].exp_walk_len * block_walks[p_blk * nblocks + c_blk];
                 }
             }
-            return nwalks;
+            return score;
         };
         
         // real_t T = 100.0, alpha = 0.2;
-        size_t max_iter = 20, iter = 0;
+        size_t max_iter = 30, iter = 0;
         size_t can_comm = 0;
-        wid_t can_nwalks = cal_nwalks(candidate_blocks);
+        // wid_t can_nwalks = cal_nwalks(candidate_blocks);
         for(auto blk : candidate_blocks) if(cache_blocks.find(blk) != cache_blocks.end()) can_comm++;
-        real_t y_can = (real_t)can_nwalks / (cache.ncblock - can_comm);
+        real_t y_can = cal_score(candidate_blocks) / (cache.ncblock - can_comm);
+        
+        // real_t y_can = (real_t)can_nwalks / (cache.ncblock - can_comm);
         // std::cout << "candidate walks : " << can_nwalks << ", y_can : " << y_can << std::endl;
 
         // std::cout << "block index : ";
@@ -717,11 +729,12 @@ private:
             std::vector<bid_t> tmp_blocks = candidate_blocks;
             size_t pos = rand() % (nblocks - cache.ncblock) + cache.ncblock, tmp_pos = rand() % cache.ncblock;
             std::swap(tmp_blocks[tmp_pos], block_indexs[pos]);
-            wid_t tmp_nwalks = cal_nwalks(tmp_blocks);
+            // wid_t tmp_nwalks = cal_nwalks(tmp_blocks);
             size_t tmp_comm = 0;
             for(auto blk : tmp_blocks) if(cache_blocks.find(blk) != cache_blocks.end()) tmp_comm++;
-            real_t y_tmp = (real_t)tmp_nwalks / (cache.ncblock - tmp_comm);
-            
+            // real_t y_tmp = (real_t)tmp_nwalks / (cache.ncblock - tmp_comm);
+            real_t y_tmp = cal_score(tmp_blocks) / (cache.ncblock - tmp_comm);
+
             if(y_tmp > y_can) {
                 // std::cout << "candidate blocks : ";
                 // for(auto blk : candidate_blocks) std::cout << blk << " ";

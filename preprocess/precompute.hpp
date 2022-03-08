@@ -500,4 +500,65 @@ void make_graph_bloom_filter(const std::string& filename, int fnum, size_t block
     logstream(LOG_DEBUG) << "successfully dump bloom filter." << std::endl;
 }
 
+/**
+ * This method does following thing:
+ * compute the expected walk length for each block
+ */
+void calc_expected_walk_length(const std::string &filename, int fnum, size_t blocksize, size_t len_limit)
+{
+    std::string vert_block_name = get_vert_blocks_name(filename, blocksize);
+    std::string edge_block_name = get_edge_blocks_name(filename, blocksize);
+    std::string csr_name = get_csr_name(filename, fnum);
+
+    std::vector<vid_t> vblocks = load_graph_blocks<vid_t>(vert_block_name);
+    std::vector<eid_t> eblocks = load_graph_blocks<eid_t>(edge_block_name);
+
+    int edgedesc = open(csr_name.c_str(), O_RDONLY);
+
+    bid_t nblocks = vblocks.size() - 1;
+    logstream(LOG_INFO) << "load vblocks and eblocks successfully, block count : " << nblocks << std::endl;
+    pre_block_t block;
+    logstream(LOG_INFO) << "start to compute block expected walk length, nblocks = " << nblocks << std::endl;
+    std::vector<real_t> block_walk_len(nblocks, 0.0);
+    std::vector<real_t> block_transit_prob(nblocks * nblocks, 0);
+    for (bid_t blk = 0; blk < nblocks; blk++)
+    {
+        block.nedges = eblocks[blk + 1] - eblocks[blk];
+        block.start_edge = eblocks[blk];
+
+        block.csr = (vid_t *)realloc(block.csr, block.nedges * sizeof(vid_t));
+        load_block_range(edgedesc, block.csr, block.nedges, block.start_edge * sizeof(vid_t));
+
+        logstream(LOG_INFO) << "start computing expected walk length for block = " << blk << std::endl;
+        std::vector<eid_t> inner_edges(nblocks, 0);
+        for(eid_t off = 0; off < block.nedges; off++) {
+            bid_t vertex_block = get_block(vblocks, block.csr[off]);
+            inner_edges[vertex_block]++;
+        }
+        real_t rat = (real_t)inner_edges[blk] / (real_t)block.nedges;
+        real_t base = 1.0, exp_walk_len = 0;
+        size_t len = 1;
+        while(len <= len_limit) {
+            exp_walk_len += len * base;
+            base *= rat;
+            len++;
+        }
+        block_walk_len[blk] = exp_walk_len;
+        for(bid_t p = 0; p < nblocks; p++) block_transit_prob[blk * nblocks + p] = (real_t)inner_edges[p] / (real_t)block.nedges;
+        logstream(LOG_INFO) << "finish computing expected walk length for block = " << blk << std::endl;
+    }
+
+    close(edgedesc);
+
+    std::string walk_length_name = get_expected_walk_length_name(filename, fnum);
+    auto stream = std::fstream(walk_length_name.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+    stream.write(reinterpret_cast<char*>(block_walk_len.data()), sizeof(real_t) * block_walk_len.size());
+    stream.close();
+
+    std::string transit_prob_name = get_transit_prob_name(filename, fnum);
+    stream = std::fstream(transit_prob_name.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+    stream.write(reinterpret_cast<char *>(block_transit_prob.data()), sizeof(real_t) * block_transit_prob.size());
+    stream.close();
+}
+
 #endif

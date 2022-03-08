@@ -93,6 +93,14 @@ inline std::string get_bloomfilter_name(std::string const & base_name, int fnum)
     return concatnate_name(base_name, fnum) + ".bf";
 }
 
+inline std::string get_expected_walk_length_name(std::string const & base_name, int fnum) {
+    return concatnate_name(base_name, fnum) + ".exp";
+}
+
+inline std::string get_transit_prob_name(std::string const & base_name, int fnum) {
+    return concatnate_name(base_name, fnum) + ".tp";
+}
+
 inline std::string get_vert_blocks_name(std::string const &base_name, size_t blocksize, bool reordered=false)
 {
     std::string ans = concatnate_name(base_name, blocksize / (1024 * 1024)) + "MB.vert.blocks";
