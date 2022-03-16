@@ -676,7 +676,7 @@ private:
         std::sort(block_indexs.begin(), block_indexs.end(), cmp);
 
         wid_t most_nwalks = 0;
-        bid_t best_index = 0;
+        bid_t best_index = cache.ncblock - 1;
         for(bid_t p_index = cache.ncblock - 1; p_index < nblocks; p_index++) {
             wid_t nwalks = 0;
             for(bid_t c_index = 0; c_index < cache.ncblock - 1; c_index++) {
@@ -710,50 +710,52 @@ private:
             }
             return score;
         };
-        
-        // real_t T = 100.0, alpha = 0.2;
-        size_t max_iter = 30, iter = 0;
-        size_t can_comm = 0;
-        // wid_t can_nwalks = cal_nwalks(candidate_blocks);
-        for(auto blk : candidate_blocks) if(cache_blocks.find(blk) != cache_blocks.end()) can_comm++;
-        real_t y_can = cal_score(candidate_blocks) / (cache.ncblock - can_comm);
-        
-        // real_t y_can = (real_t)can_nwalks / (cache.ncblock - can_comm);
-        // std::cout << "candidate walks : " << can_nwalks << ", y_can : " << y_can << std::endl;
 
-        // std::cout << "block index : ";
-        // for(auto blk : block_indexs) std::cout << blk << " ";
-        // std::cout << std::endl;
+        if(cache.ncblock < nblocks) {
+            // real_t T = 100.0, alpha = 0.2;
+            size_t max_iter = 30, iter = 0;
+            size_t can_comm = 0;
+            // wid_t can_nwalks = cal_nwalks(candidate_blocks);
+            for(auto blk : candidate_blocks) if(cache_blocks.find(blk) != cache_blocks.end()) can_comm++;
+            real_t y_can = cal_score(candidate_blocks) / (cache.ncblock - can_comm);
 
-        while(iter < max_iter) {
-            std::vector<bid_t> tmp_blocks = candidate_blocks;
-            size_t pos = rand() % (nblocks - cache.ncblock) + cache.ncblock, tmp_pos = rand() % cache.ncblock;
-            std::swap(tmp_blocks[tmp_pos], block_indexs[pos]);
-            // wid_t tmp_nwalks = cal_nwalks(tmp_blocks);
-            size_t tmp_comm = 0;
-            for(auto blk : tmp_blocks) if(cache_blocks.find(blk) != cache_blocks.end()) tmp_comm++;
-            // real_t y_tmp = (real_t)tmp_nwalks / (cache.ncblock - tmp_comm);
-            real_t y_tmp = cal_score(tmp_blocks) / (cache.ncblock - tmp_comm);
+            // real_t y_can = (real_t)can_nwalks / (cache.ncblock - can_comm);
+            // std::cout << "candidate walks : " << can_nwalks << ", y_can : " << y_can << std::endl;
 
-            if(y_tmp > y_can) {
-                // std::cout << "candidate blocks : ";
-                // for(auto blk : candidate_blocks) std::cout << blk << " ";
-                // std::cout << std::endl;
-                // std::cout << "tmp blocks : ";
-                // for(auto blk : tmp_blocks) std::cout << blk << " ";
-                // std::cout << std::endl;
-                candidate_blocks = tmp_blocks;
-                y_can = y_tmp;
-                // std::cout << "tmp walks : " << tmp_nwalks << ", tmp_can : " << y_tmp  << ", pos" << pos << std::endl;
-            } else {
+            // std::cout << "block index : ";
+            // for(auto blk : block_indexs) std::cout << blk << " ";
+            // std::cout << std::endl;
+
+            while(iter < max_iter) {
+                std::vector<bid_t> tmp_blocks = candidate_blocks;
+                size_t pos = rand() % (nblocks - cache.ncblock) + cache.ncblock, tmp_pos = rand() % cache.ncblock;
                 std::swap(tmp_blocks[tmp_pos], block_indexs[pos]);
+                // wid_t tmp_nwalks = cal_nwalks(tmp_blocks);
+                size_t tmp_comm = 0;
+                for(auto blk : tmp_blocks) if(cache_blocks.find(blk) != cache_blocks.end()) tmp_comm++;
+                // real_t y_tmp = (real_t)tmp_nwalks / (cache.ncblock - tmp_comm);
+                real_t y_tmp = cal_score(tmp_blocks) / (cache.ncblock - tmp_comm);
+
+                if(y_tmp > y_can) {
+                    // std::cout << "candidate blocks : ";
+                    // for(auto blk : candidate_blocks) std::cout << blk << " ";
+                    // std::cout << std::endl;
+                    // std::cout << "tmp blocks : ";
+                    // for(auto blk : tmp_blocks) std::cout << blk << " ";
+                    // std::cout << std::endl;
+                    candidate_blocks = tmp_blocks;
+                    y_can = y_tmp;
+                    // std::cout << "tmp walks : " << tmp_nwalks << ", tmp_can : " << y_tmp  << ", pos" << pos << std::endl;
+                } else {
+                    std::swap(tmp_blocks[tmp_pos], block_indexs[pos]);
+                }
+                iter++;
             }
-            iter++;
         }
 
         buckets = candidate_blocks;
         std::unordered_set<bid_t> bucket_uncached, bucket_cached;
-        
+
         for(bid_t blk = 0; blk < buckets.size(); blk++) {
             if(cache_blocks.find(buckets[blk]) != cache_blocks.end()) {
                 bucket_cached.insert(buckets[blk]);
@@ -771,7 +773,7 @@ private:
             std::cout << "swap block info, blk = " << blk << ", from " << cache_index << " to " << pos << std::endl;
             pos++;
         }
-        
+
         for(auto blk : bucket_uncached) {
             if(cache.cache_blocks[pos].block != NULL) {
                 cache.cache_blocks[pos].block->cache_index = nblocks;
