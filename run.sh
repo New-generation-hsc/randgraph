@@ -2,7 +2,7 @@
 
 # DATASET="/home/hsc/dataset/twitter/twitter_rv.net"
 # DATASET="/home/hsc/dataset/twitter/w-twitter_rv.net"
-DATASET="/home/hsc/dataset/livejournal/soc-LiveJournal1.txt"
+DATASET="/dataset/livejournal/soc-LiveJournal1.txt"
 # DATASET="/home/hsc/dataset/livejournal/w-soc-livejournal.txt"
 VERTICES=61578415
 STEPS=100

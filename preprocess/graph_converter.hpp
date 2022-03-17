@@ -88,11 +88,11 @@ private:
     }
 
     void flush_csr() {
-        eid_t max_nedges = (eid_t)FILE_SIZE / sizeof(vid_t);
-        if(rd_edges + csr.size() > max_nedges) {
-            fnum += 1;
-            rd_edges = 0;
-        }
+        // eid_t max_nedges = (eid_t)FILE_SIZE / sizeof(vid_t);
+        // if(rd_edges + csr.size() > max_nedges) {
+        //     fnum += 1;
+        //     rd_edges = 0;
+        // }
         std::string name = get_csr_name(output_filename, fnum);
         appendfile(name, csr.buffer_begin(), csr.size());
         rd_edges += csr.size();

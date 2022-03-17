@@ -734,7 +734,8 @@ private:
                 size_t tmp_comm = 0;
                 for(auto blk : tmp_blocks) if(cache_blocks.find(blk) != cache_blocks.end()) tmp_comm++;
                 // real_t y_tmp = (real_t)tmp_nwalks / (cache.ncblock - tmp_comm);
-                real_t y_tmp = cal_score(tmp_blocks) / (cache.ncblock - tmp_comm);
+                real_t y_tmp = 0.0;
+                if(tmp_comm < cache.ncblock) y_tmp = cal_score(tmp_blocks) / (cache.ncblock - tmp_comm);
 
                 if(y_tmp > y_can) {
                     // std::cout << "candidate blocks : ";
