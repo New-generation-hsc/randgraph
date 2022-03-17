@@ -113,10 +113,10 @@ int main(int argc, const char *argv[])
 
     scheduler<surfer_scheduler_t> walk_scheduler(m);
     // complex_sample_context_t sample_context(sampler, &its_sampler);
-    naive_sample_context_t sample_context(sampler);
+    // naive_sample_context_t sample_context(sampler);
 
     engine.prologue(userprogram);
-    engine.run(userprogram, &walk_scheduler, &sample_context);
+    engine.run(userprogram, &walk_scheduler, sampler);
     engine.epilogue(userprogram);
 
     sampler->report();

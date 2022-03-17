@@ -88,11 +88,11 @@ private:
     }
 
     void flush_csr() {
-        eid_t max_nedges = (eid_t)FILE_SIZE / sizeof(vid_t);
-        if(rd_edges + csr.size() > max_nedges) {
-            fnum += 1;
-            rd_edges = 0;
-        }
+        // eid_t max_nedges = (eid_t)FILE_SIZE / sizeof(vid_t);
+        // if(rd_edges + csr.size() > max_nedges) {
+        //     fnum += 1;
+        //     rd_edges = 0;
+        // }
         std::string name = get_csr_name(output_filename, fnum);
         appendfile(name, csr.buffer_begin(), csr.size());
         rd_edges += csr.size();
@@ -274,7 +274,10 @@ void convert(std::string filename, graph_converter &converter, size_t blocksize 
     }
 
     /* make bloom filter for each block */
-    make_graph_bloom_filter(converter.get_output_filename(), 0, blocksize, false);
+    // make_graph_bloom_filter(converter.get_output_filename(), 0, blocksize, false);
+
+    /* make the expected walk length */
+    calc_expected_walk_length(converter.get_output_filename(), 0, blocksize, 10);
 }
 
 /** compute the given graph each vertex point to the same block ratio */

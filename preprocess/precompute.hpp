@@ -7,6 +7,7 @@
 #include <queue>
 #include <omp.h>
 #include <algorithm>
+#include <unordered_set>
 #include "api/types.hpp"
 #include "util/util.hpp"
 #include "util/io.hpp"
@@ -498,6 +499,112 @@ void make_graph_bloom_filter(const std::string& filename, int fnum, size_t block
         logstream(LOG_INFO) << "finish making bloom filter for block = " << blk << std::endl;
     }
     logstream(LOG_DEBUG) << "successfully dump bloom filter." << std::endl;
+}
+
+real_t calc_block_expect_walk_len(pre_block_t *block, size_t len_limit)
+{
+    std::unordered_set<vid_t> tmp_block_vertices;
+    std::vector<vid_t> block_vertics(block->nverts);
+    std::iota(block_vertics.begin(), block_vertics.end(), block->start_vert);
+    size_t len = 1;
+
+    real_t exp_walk_len = 0.0, base = 1.0;
+    
+    while (len <= len_limit) {
+        real_t r = 0.0;
+        for(auto v : block_vertics) {
+            vid_t v_off = v - block->start_vert;
+            eid_t adj_start = block->beg_pos[v_off] - block->start_edge, adj_end = block->beg_pos[v_off + 1] - block->start_edge;
+            size_t inner_count = 0;
+            for(eid_t off = adj_start; off < adj_end; off++) {
+                if(block->csr[off] >= block->start_vert && block->csr[off] < block->start_vert + block->nverts) {
+                    tmp_block_vertices.insert(block->csr[off]);
+                    inner_count++;
+                }
+            }
+
+            if(adj_end > adj_start && inner_count > 0) {
+                r += inner_count / (adj_end - adj_start);
+            }
+        }
+        exp_walk_len += len * base;
+        logstream(LOG_DEBUG) << "cal block expect walk len : " << exp_walk_len << ", tmp_block_vertices size : " << tmp_block_vertices.size() << std::endl;
+        base *= r / block_vertics.size();
+        len++;
+        
+        if(tmp_block_vertices.empty()) break;
+        block_vertics = std::vector<vid_t>(tmp_block_vertices.begin(), tmp_block_vertices.end());
+        tmp_block_vertices.clear();
+    }
+    return exp_walk_len;
+}
+
+/**
+ * This method does following thing:
+ * compute the expected walk length for each block
+ */
+void calc_expected_walk_length(const std::string &filename, int fnum, size_t blocksize, size_t len_limit)
+{
+    std::string vert_block_name = get_vert_blocks_name(filename, blocksize);
+    std::string edge_block_name = get_edge_blocks_name(filename, blocksize);
+    std::string csr_name = get_csr_name(filename, fnum);
+    std::string beg_pos_name = get_beg_pos_name(filename, fnum);
+
+    std::vector<vid_t> vblocks = load_graph_blocks<vid_t>(vert_block_name);
+    std::vector<eid_t> eblocks = load_graph_blocks<eid_t>(edge_block_name);
+
+    int vertdesc = open(beg_pos_name.c_str(), O_RDONLY);
+    int edgedesc = open(csr_name.c_str(), O_RDONLY);
+
+    bid_t nblocks = vblocks.size() - 1;
+    logstream(LOG_INFO) << "load vblocks and eblocks successfully, block count : " << nblocks << std::endl;
+    pre_block_t block;
+    logstream(LOG_INFO) << "start to compute block expected walk length, nblocks = " << nblocks << std::endl;
+    std::vector<real_t> block_walk_len(nblocks, 0.0);
+    // std::vector<real_t> block_transit_prob(nblocks * nblocks, 0);
+    for (bid_t blk = 0; blk < nblocks; blk++)
+    {
+        block.nverts = vblocks[blk + 1] - vblocks[blk];
+        block.nedges = eblocks[blk + 1] - eblocks[blk];
+        block.start_edge = eblocks[blk];
+        block.start_vert = vblocks[blk];
+
+        block.beg_pos = (eid_t*)realloc(block.beg_pos, (block.nverts + 1) * sizeof(eid_t));
+        load_block_range(vertdesc, block.beg_pos, block.nverts + 1, block.start_vert * sizeof(eid_t));
+        block.csr = (vid_t *)realloc(block.csr, block.nedges * sizeof(vid_t));
+        load_block_range(edgedesc, block.csr, block.nedges, block.start_edge * sizeof(vid_t));
+
+        logstream(LOG_INFO) << "start computing expected walk length for block = " << blk << std::endl;
+        // std::vector<eid_t> inner_edges(nblocks, 0);
+        // for(eid_t off = 0; off < block.nedges; off++) {
+        //     bid_t vertex_block = get_block(vblocks, block.csr[off]);
+        //     inner_edges[vertex_block]++;
+        // }
+        // real_t rat = (real_t)inner_edges[blk] / (real_t)block.nedges;
+        // real_t base = 1.0, exp_walk_len = 0;
+        // size_t len = 1;
+        // while(len <= len_limit) {
+        //     exp_walk_len += len * base;
+        //     base *= rat;
+        //     len++;
+        // }
+        // block_walk_len[blk] = exp_walk_len;
+        // for(bid_t p = 0; p < nblocks; p++) block_transit_prob[blk * nblocks + p] = (real_t)inner_edges[p] / (real_t)block.nedges;
+        block_walk_len[blk] = calc_block_expect_walk_len(&block, len_limit);
+        logstream(LOG_INFO) << "finish computing expected walk length for block = " << blk << std::endl;
+    }
+
+    close(edgedesc);
+
+    std::string walk_length_name = get_expected_walk_length_name(filename, fnum);
+    auto stream = std::fstream(walk_length_name.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+    stream.write(reinterpret_cast<char*>(block_walk_len.data()), sizeof(real_t) * block_walk_len.size());
+    stream.close();
+
+    // std::string transit_prob_name = get_transit_prob_name(filename, fnum);
+    // stream = std::fstream(transit_prob_name.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+    // stream.write(reinterpret_cast<char *>(block_transit_prob.data()), sizeof(real_t) * block_transit_prob.size());
+    // stream.close();
 }
 
 #endif
