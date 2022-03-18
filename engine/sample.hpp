@@ -433,43 +433,43 @@ public:
 
     virtual vid_t sample(walk_context<SECONDORDERCTX> &ctx, walk_timer* wtimer)
     {
-        wtimer->start_time("reject_sample_initialization");
-        std::vector<real_t> adj_weights;
-        ctx.query_neigbors_weight(adj_weights);
-        wtimer->stop_time("reject_sample_initialization");
-        wtimer->start_time("reject_sample_generation");
-        size_t off = reject_sample_impl(adj_weights.begin(), adj_weights.end(), ctx.local_seed);
-        wtimer->stop_time("reject_sample_generation");
-        return ctx.adj_start[off];
-        // wtimer->start_time("reject_sample");
-        // size_t n = static_cast<size_t>(ctx.adj_end - ctx.adj_start);
-        // real_t pmax = ctx.query_max_weight(), pmin = ctx.query_min_weight();
-        // // logstream(LOG_INFO) << "reject sample vertex : " << ctx.cur_vertex << ", pmax : " << pmax << ", pmin : " << pmin  << ", prev_vertex degree : " << (ctx.prev_adj_end - ctx.prev_adj_start) << ", cur_vertex degree : " << (ctx.adj_end - ctx.adj_start) << std::endl;
-        // bool accept = false;
-        // size_t rand_pos = 0;
-        // size_t counter = 0;
-        // while(!accept) {
-        //     real_t rand_val = static_cast<real_t>(rand_r(ctx.local_seed)) / static_cast<real_t>(RAND_MAX) * pmax;
-        //     rand_pos = rand_r(ctx.local_seed) % n;
+        // wtimer->start_time("reject_sample_initialization");
+        // std::vector<real_t> adj_weights;
+        // ctx.query_neigbors_weight(adj_weights);
+        // wtimer->stop_time("reject_sample_initialization");
+        // wtimer->start_time("reject_sample_generation");
+        // size_t off = reject_sample_impl(adj_weights.begin(), adj_weights.end(), ctx.local_seed);
+        // wtimer->stop_time("reject_sample_generation");
+        // return ctx.adj_start[off];
+        wtimer->start_time("reject_sample");
+        size_t n = static_cast<size_t>(ctx.adj_end - ctx.adj_start);
+        real_t pmax = ctx.query_max_weight(), pmin = ctx.query_min_weight();
+        // logstream(LOG_INFO) << "reject sample vertex : " << ctx.cur_vertex << ", pmax : " << pmax << ", pmin : " << pmin  << ", prev_vertex degree : " << (ctx.prev_adj_end - ctx.prev_adj_start) << ", cur_vertex degree : " << (ctx.adj_end - ctx.adj_start) << std::endl;
+        bool accept = false;
+        size_t rand_pos = 0;
+        size_t counter = 0;
+        while(!accept) {
+            real_t rand_val = static_cast<real_t>(rand_r(ctx.local_seed)) / static_cast<real_t>(RAND_MAX) * pmax;
+            rand_pos = rand_r(ctx.local_seed) % n;
+            sample_policy_t::increase();
+            if(rand_val <= pmin || rand_val < ctx.query_vertex_weight(rand_pos)) {
+                accept = true;
+            }
+            // logstream(LOG_INFO) << "reject sample vertex : " << ctx.cur_vertex << ", rand_pos : " << rand_pos << ", rand_val : " << rand_val << std::endl;
+            counter++;
+            if(counter > 500) {
+                logstream(LOG_DEBUG) << "reject sample vertex : " << ctx.cur_vertex << ", pmax : " << pmax << ", pmin : " << pmin  << ", prev_vertex degree : " << (ctx.prev_adj_end - ctx.prev_adj_start) << ", cur_vertex degree : " << (ctx.adj_end - ctx.adj_start) << std::endl;
+                exit(0);
+            }
+        }
+        // while (rand_val > ctx.query_vertex_weight(rand_pos))
+        // {
         //     sample_policy_t::increase();
-        //     if(rand_val <= pmin || rand_val < ctx.query_vertex_weight(rand_pos)) {
-        //         accept = true;
-        //     }
-        //     // logstream(LOG_INFO) << "reject sample vertex : " << ctx.cur_vertex << ", rand_pos : " << rand_pos << ", rand_val : " << rand_val << std::endl;
-        //     counter++;
-        //     if(counter > 500) {
-        //         logstream(LOG_DEBUG) << "reject sample vertex : " << ctx.cur_vertex << ", pmax : " << pmax << ", pmin : " << pmin  << ", prev_vertex degree : " << (ctx.prev_adj_end - ctx.prev_adj_start) << ", cur_vertex degree : " << (ctx.adj_end - ctx.adj_start) << std::endl;
-        //         exit(0);
-        //     }
+        //     rand_pos = rand_r(ctx.local_seed) % n;
+        //     rand_val = static_cast<real_t>(rand_r(ctx.local_seed)) / static_cast<real_t>(RAND_MAX) * pmax;
         // }
-        // // while (rand_val > ctx.query_vertex_weight(rand_pos))
-        // // {
-        // //     sample_policy_t::increase();
-        // //     rand_pos = rand_r(ctx.local_seed) % n;
-        // //     rand_val = static_cast<real_t>(rand_r(ctx.local_seed)) / static_cast<real_t>(RAND_MAX) * pmax;
-        // // }
-        // wtimer->stop_time("reject_sample");
-        // return ctx.adj_start[rand_pos];
+        wtimer->stop_time("reject_sample");
+        return ctx.adj_start[rand_pos];
     }
 
     virtual vid_t sample(walk_context<BIASEDSECONDORDERCTX> &ctx, walk_timer* wtimer)
