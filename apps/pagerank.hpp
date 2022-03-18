@@ -43,7 +43,7 @@ public:
     }
 
     template <typename walk_data_t, WalkType walk_type>
-    void prologue(graph_walk<walk_data_t, walk_type> *walk_manager)
+    void prologue(graph_walk<walk_data_t, walk_type> *walk_manager, std::function<void(graph_walk<walk_data_t, walk_type> *)> init_func = nullptr)
     {
     }
 
@@ -61,7 +61,7 @@ public:
 };
 
 template <>
-void pagerank_t::prologue<empty_data_t, FirstOrder>(graph_walk<empty_data_t, FirstOrder> *walk_manager)
+void pagerank_t::prologue<empty_data_t, FirstOrder>(graph_walk<empty_data_t, FirstOrder> *walk_manager, std::function<void(graph_walk<empty_data_t, FirstOrder> *)>)
 {
     wid_t total_walks = 0;
     for(vid_t vertex = _conf.firstsource; (vertex < _conf.firstsource + _conf.numsources) && (vertex < walk_manager->nvertices); vertex++) {

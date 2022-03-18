@@ -54,7 +54,7 @@ public:
     }
 
     template <typename walk_data_t, WalkType walk_type>
-    void prologue(graph_walk<walk_data_t, walk_type> *walk_manager)
+    void prologue(graph_walk<walk_data_t, walk_type> *walk_manager, std::function<void(graph_walk<walk_data_t, walk_type> *walk_manager)> init_func = nullptr)
     {
     }
 
@@ -74,7 +74,7 @@ public:
 };
 
 template <>
-void second_order_app_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOrder> *walk_manager)
+void second_order_app_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOrder> *walk_manager, std::function <void(graph_walk<vid_t, SecondOrder> *)> init_func)
 {
     wtimer.register_entry("walker_update");
     wtimer.register_entry("vertex_sample");
@@ -87,15 +87,16 @@ void second_order_app_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOr
     wtimer.register_entry("its_sample_make_cdf");
     wtimer.register_entry("its_sample_vertex");
 
-    #pragma omp parallel for schedule(static)
-    for (vid_t vertex = 0; vertex < walk_manager->nvertices; vertex++)
-    {
-        wid_t idx = vertex * this->_walkpersource;
-        for(wid_t off = 0; off < this->_walkpersource; off++) {
-            walker_t<vid_t> walker = walker_makeup<vid_t>(vertex, idx + off, vertex, vertex, this->_hops);
-            walk_manager->move_walk(walker);
-        }
-    }
+    // #pragma omp parallel for schedule(static)
+    // for (vid_t vertex = 0; vertex < walk_manager->nvertices; vertex++)
+    // {
+    //     wid_t idx = vertex * this->_walkpersource;
+    //     for(wid_t off = 0; off < this->_walkpersource; off++) {
+    //         walker_t<vid_t> walker = walker_makeup<vid_t>(vertex, idx + off, vertex, vertex, this->_hops);
+    //         walk_manager->move_walk(walker);
+    //     }
+    // }
+    if(init_func) init_func(walk_manager);
     // vid_t vertex = 10009;
     // #pragma omp parallel for schedule(static)
     // for(wid_t off = 0; off < this->_walkpersource; off++) {

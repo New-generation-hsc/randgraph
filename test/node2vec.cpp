@@ -30,6 +30,11 @@ int main(int argc, const char *argv[])
     bool reordered = get_option_bool("reordered");
     bool filter = get_option_bool("filter");
     bool dynamic = get_option_bool("dynamic");
+    wid_t walks = (wid_t)get_option_int("walkpersource", 10);
+    hid_t steps = (hid_t)get_option_int("length", 80);
+    real_t p = (real_t)get_option_float("p", 0.5);
+    real_t q = (real_t)get_option_float("q", 2.0);
+
     load_graph_meta(base_name, &nvertices, &nedges, weighted);
 
     graph_config conf = {
@@ -46,15 +51,11 @@ int main(int argc, const char *argv[])
     };
 
     graph_block blocks(&conf);
-    metrics m("node2vec");
+    metrics m("node2vec_walkpersource_" + std::to_string(walks) + "_steps_" + std::to_string(steps) + "_dataset_" + argv[1]);
     graph_driver driver(&conf, m);
 
     graph_walk<vid_t, SecondOrder> walk_mangager(conf, driver, blocks);
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
-    wid_t walks = (wid_t)get_option_int("walkpersource", 10);
-    hid_t steps = (hid_t)get_option_int("length", 80);
-    real_t p = (real_t)get_option_float("p", 0.5);
-    real_t q = (real_t)get_option_float("q", 2.0);
     graph_cache cache(min_value(nmblocks, blocks.nblocks), &conf);
 
     second_order_param_t app_param = {(real_t)0.0, (real_t)1.0 / p, (real_t)1.0, (real_t)1.0 / q };
@@ -98,7 +99,20 @@ int main(int argc, const char *argv[])
     // complex_sample_context_t sample_context(sampler, &its_sampler);
     // naive_sample_context_t sample_context(sampler);
 
-    engine.prologue(userprogram);
+    auto init_func = [walks, steps](graph_walk<vid_t, SecondOrder> *walk_manager)
+    {
+        #pragma omp parallel for schedule(static)
+        for (vid_t vertex = 0; vertex < walk_manager->nvertices; vertex++)
+        {
+            wid_t idx = vertex * walks;
+            for(wid_t off = 0; off < walks; off++) {
+                walker_t<vid_t> walker = walker_makeup<vid_t>(vertex, idx + off, vertex, vertex, steps);
+                walk_manager->move_walk(walker);
+            }
+        }
+    };
+
+    engine.prologue(userprogram, init_func);
     engine.run(userprogram, &walk_scheduler, sampler);
     engine.epilogue(userprogram);
 

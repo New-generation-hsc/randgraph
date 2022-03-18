@@ -1,6 +1,7 @@
 #ifndef _GRAPH_ENGINE_H_
 #define _GRAPH_ENGINE_H_
 
+#include <functional>
 #include "cache.hpp"
 #include "schedule.hpp"
 #include "apps/userprogram.hpp"
@@ -32,8 +33,9 @@ public:
         }
     }
 
-    template<typename AppType, typename AppConfig>
-    void prologue(userprogram_t<AppType, AppConfig>& userprogram) {
+    template <typename AppType, typename AppConfig>
+    void prologue(userprogram_t<AppType, AppConfig> &userprogram, std::function<void(graph_walk<walk_data_t, walk_type> *)> init_func = nullptr)
+    {
         logstream(LOG_INFO) << "  =================  STARTED  ======================  " << std::endl;
         logstream(LOG_INFO) << "Random walks, random generate " << userprogram.get_numsources() << " walks on whole graph, exec_threads = " << conf->nthreads << std::endl;
         logstream(LOG_INFO) << "vertices : " << conf->nvertices << ", edges : " << conf->nedges << std::endl;
@@ -41,7 +43,8 @@ public:
         tid_t exec_threads = conf->nthreads;
         omp_set_num_threads(exec_threads);
 
-        userprogram.prologue(walk_manager);
+        _m.start_time("run_app");
+        userprogram.prologue(walk_manager, init_func);
     }
 
     template <typename BaseType, typename AppType, typename AppConfig>
@@ -86,6 +89,7 @@ public:
     void epilogue(userprogram_t<AppType, AppConfig> &userprogram)
     {
         userprogram.epilogue();
+        _m.stop_time("run_app");
         logstream(LOG_INFO) << "  ================= FINISHED ======================  " << std::endl;
     }
 

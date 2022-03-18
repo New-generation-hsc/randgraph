@@ -30,6 +30,11 @@ int main(int argc, const char *argv[])
     bool reordered = get_option_bool("reordered");
     bool filter = get_option_bool("filter");
     bool dynamic = get_option_bool("dynamic");
+    
+    wid_t walks = (wid_t)get_option_int("walksource", 100000);
+    hid_t steps = (hid_t)get_option_int("length", 25);
+    real_t alpha = (real_t)get_option_float("alpha", 0.2);
+
     load_graph_meta(base_name, &nvertices, &nedges, weighted);
 
     graph_config conf = {
@@ -46,14 +51,13 @@ int main(int argc, const char *argv[])
     };
 
     graph_block blocks(&conf);
-    metrics m("autoregressive");
+    bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
+
+    metrics m("autoregressive_walksource_" + std::to_string(walks) + "_steps_" + std::to_string(steps) + "_dataset_" + argv[1]);
     graph_driver driver(&conf, m);
 
     graph_walk<vid_t, SecondOrder> walk_mangager(conf, driver, blocks);
-    bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
-    wid_t walks = (wid_t)get_option_int("walkpersource", 100000);
-    hid_t steps = (hid_t)get_option_int("length", 25);
-    real_t alpha = (real_t)get_option_float("alpha", 0.2);
+    
     graph_cache cache(min_value(nmblocks, blocks.nblocks), &conf);
 
     second_order_param_t app_param = { alpha, (real_t)(1.0 - alpha), (real_t)(1.0 - alpha), (real_t)(1.0 - alpha)};
@@ -111,11 +115,22 @@ int main(int argc, const char *argv[])
 
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
-    scheduler<surfer_scheduler_t> walk_scheduler(m);
+    scheduler<simulated_annealing_scheduler_t> walk_scheduler(m);
     // complex_sample_context_t sample_context(sampler, &its_sampler);
     // naive_sample_context_t sample_context(sampler);
 
-    engine.prologue(userprogram);
+    auto init_func = [walks, steps](graph_walk<vid_t, SecondOrder> *walk_manager)
+    {
+        #pragma omp parallel for schedule(static)
+        for(wid_t off = 0; off < walks; off++)
+        {
+            vid_t vertex = rand() % walk_manager->nvertices;
+            walker_t<vid_t> walker = walker_makeup<vid_t>(vertex, off, vertex, vertex, steps);
+            walk_manager->move_walk(walker);
+        }
+    };
+
+    engine.prologue(userprogram, init_func);
     engine.run(userprogram, &walk_scheduler, sampler);
     engine.epilogue(userprogram);
 
