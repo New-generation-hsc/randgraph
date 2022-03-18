@@ -24,11 +24,13 @@ int main(int argc, const char* argv[]) {
     vid_t nvertices;
     eid_t nedges;
     bool weighted = get_option_bool("weighted");
+    size_t cache_size = get_option_int("cache", MEMORY_CACHE / (1024 * 1024));
     load_graph_meta(base_name, &nvertices, &nedges, weighted);
 
     graph_config conf = {
         base_name,
         0,
+        cache_size * 1024LL * 1024 * 1024,
         BLOCK_SIZE,
         (tid_t)omp_get_max_threads(),
         nvertices,

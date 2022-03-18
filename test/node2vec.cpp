@@ -30,6 +30,7 @@ int main(int argc, const char *argv[])
     bool reordered = get_option_bool("reordered");
     bool filter = get_option_bool("filter");
     bool dynamic = get_option_bool("dynamic");
+    size_t cache_size = get_option_int("cache", MEMORY_CACHE / (1024 * 1024));
     wid_t walks = (wid_t)get_option_int("walkpersource", 10);
     hid_t steps = (hid_t)get_option_int("length", 80);
     real_t p = (real_t)get_option_float("p", 0.5);
@@ -40,6 +41,7 @@ int main(int argc, const char *argv[])
     graph_config conf = {
         base_name,
         0,
+        cache_size * 1024LL * 1024 * 1024,
         BLOCK_SIZE,
         (tid_t)omp_get_max_threads(),
         nvertices,
