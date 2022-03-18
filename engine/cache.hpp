@@ -41,12 +41,22 @@ public:
     rank_t rank;                        /* record the block rank */
     std::shared_ptr<std::mutex> mtx;    /* mutex for safe update the rank */
 
+    real_t exp_walk_len;                /* expected walk length */
+
+#ifdef PROF_METRIC
+    size_t loaded_count;
+#endif
+
     block_t() {
         blk = cache_index = 0;
         start_vert = nverts = 0;
         start_edge = nedges = 0;
         status  = INACTIVE;
         mtx = std::make_shared<std::mutex>();
+
+#ifdef PROF_METRIC
+        loaded_count = 0;
+#endif
     }
 
     block_t& operator=(const block_t& other) {
@@ -61,6 +71,10 @@ public:
         }
         return *this;
     }
+
+#ifdef PROF_METRIC
+    void update_loaded_count() { loaded_count += 1; };
+#endif
 };
 
 class cache_block {
@@ -120,14 +134,37 @@ void swap(cache_block& cb1, cache_block& cb2) {
     eid_t *tbeg_pos = cb2.beg_pos;
     vid_t *tdegree  = cb2.degree;
     vid_t *tcsr     = cb2.csr;
+    real_t *tw      = cb2.weights;
+    real_t *tp      = cb2.prob;
+    vid_t *ta       = cb2.alias;
+    real_t *tacc    = cb2.acc_weights;
+    BloomFilter *tbf = cb2.bf;
+    bool tl         = cb2.loaded_alias;
+    int tlife       = cb2.life;
+
     cb2.block = cb1.block;
     cb2.beg_pos = cb1.beg_pos;
     cb2.degree = cb1.degree;
     cb2.csr = cb1.csr;
+    cb2.weights = cb1.weights;
+    cb2.prob    = cb1.prob;
+    cb2.alias   = cb1.alias;
+    cb2.acc_weights = cb1.acc_weights;
+    cb2.bf      = cb1.bf;
+    cb2.loaded_alias = cb1.loaded_alias;
+    cb2.life    = cb1.life;
+
     cb1.block = tblock;
     cb1.beg_pos = tbeg_pos;
     cb1.degree = tdegree;
     cb1.csr = tcsr;
+    cb1.weights = tw;
+    cb1.prob = tp;
+    cb1.alias = ta;
+    cb1.acc_weights = tacc;
+    cb1.bf = tbf;
+    cb1.loaded_alias = tl;
+    cb1.life = tlife;
 }
 
 class graph_block {
@@ -138,9 +175,11 @@ public:
     graph_block(graph_config* conf) {
         std::string vert_block_name = get_vert_blocks_name(conf->base_name, conf->blocksize, conf->reordered);
         std::string edge_block_name = get_edge_blocks_name(conf->base_name, conf->blocksize, conf->reordered);
+        std::string walk_len_name   = get_expected_walk_length_name(conf->base_name, conf->fnum);
 
         std::vector<vid_t> vblocks = load_graph_blocks<vid_t>(vert_block_name);
         std::vector<eid_t> eblocks = load_graph_blocks<eid_t>(edge_block_name);
+        std::vector<real_t> wblocks = load_graph_blocks<real_t>(walk_len_name);
 
         nblocks = vblocks.size() - 1;
         blocks.resize(nblocks);
@@ -154,6 +193,7 @@ public:
             blocks[blk].nedges     = eblocks[blk+1] - eblocks[blk];
             blocks[blk].status     = INACTIVE;
             blocks[blk].rank       = 0;
+            blocks[blk].exp_walk_len = wblocks[blk];
 
             logstream(LOG_INFO) << "blk [ " << blk << " ] : vert = [ " << blocks[blk].start_vert << ", " << blocks[blk].start_vert + blocks[blk].nverts << " ], csr = [ ";
             logstream(LOG_INFO) << blocks[blk].start_edge << ", " << blocks[blk].start_edge + blocks[blk].nedges << " ]" << std::endl;
@@ -184,6 +224,13 @@ public:
         return nblocks;
     }
 
+#ifdef PROF_METRIC
+    void report() {
+        for(bid_t blk = 0; blk < nblocks; blk++) {
+            logstream(LOG_INFO) << "blk [ " << blk << " ] : loaded count = [ " << blocks[blk].loaded_count << " ]" << std::endl;
+        }
+    }
+#endif
 };
 
 class graph_cache {

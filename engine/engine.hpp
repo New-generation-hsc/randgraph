@@ -1,6 +1,7 @@
 #ifndef _GRAPH_ENGINE_H_
 #define _GRAPH_ENGINE_H_
 
+#include <functional>
 #include "cache.hpp"
 #include "schedule.hpp"
 #include "apps/userprogram.hpp"
@@ -32,8 +33,9 @@ public:
         }
     }
 
-    template<typename AppType, typename AppConfig>
-    void prologue(userprogram_t<AppType, AppConfig>& userprogram) {
+    template <typename AppType, typename AppConfig>
+    void prologue(userprogram_t<AppType, AppConfig> &userprogram, std::function<void(graph_walk<walk_data_t, walk_type> *)> init_func = nullptr)
+    {
         logstream(LOG_INFO) << "  =================  STARTED  ======================  " << std::endl;
         logstream(LOG_INFO) << "Random walks, random generate " << userprogram.get_numsources() << " walks on whole graph, exec_threads = " << conf->nthreads << std::endl;
         logstream(LOG_INFO) << "vertices : " << conf->nvertices << ", edges : " << conf->nedges << std::endl;
@@ -41,18 +43,18 @@ public:
         tid_t exec_threads = conf->nthreads;
         omp_set_num_threads(exec_threads);
 
-        userprogram.prologue(walk_manager);
+        _m.start_time("run_app");
+        userprogram.prologue(walk_manager, init_func);
     }
 
     template <typename BaseType, typename AppType, typename AppConfig>
-    void run(userprogram_t<AppType, AppConfig> &userprogram, scheduler<BaseType> *block_scheduler, sample_context_t *sampler_context)
+    void run(userprogram_t<AppType, AppConfig> &userprogram, scheduler<BaseType> *block_scheduler, sample_policy_t *sampler)
     {
         logstream(LOG_DEBUG) << "graph blocks : " << walk_manager->global_blocks->nblocks << ", memory blocks : " << cache->ncblock << std::endl;
         logstream(LOG_INFO) << "Random walks start executing, please wait for a minute." << std::endl;
         gtimer.start_time();
         int run_count = 0;
         bid_t nblocks = walk_manager->global_blocks->nblocks, cur_block = nblocks;
-        sample_policy_t *sampler = nullptr;
         wid_t nwalks = 0, interval_max_walks = conf->nthreads * MAX_TWALKS;
         while(!walk_manager->test_finished_walks()) {
             // wid_t total_walks = walk_manager->nwalks();
@@ -64,17 +66,13 @@ public:
             if (select_block % nblocks != cur_block)
             {
                 cur_block = select_block % nblocks;
-                wid_t approximate_walks = 0;
-                for (bid_t blk = 0; blk < nblocks; blk++)
-                    approximate_walks += walk_manager->nblockwalks(blk * nblocks + cur_block);
                 wid_t total_walks = walk_manager->nwalks();
 
                 bid_t cache_index = (*(walk_manager->global_blocks))[cur_block].cache_index;
                 cache_block *run_block = &cache->cache_blocks[cache_index];
-                sampler = sampler_context->sample_switch(run_block, approximate_walks, total_walks);
 
-                logstream(LOG_DEBUG) << "run time : " << gtimer.runtime() << ", run block =  " << cur_block << ", approximate walks = " << approximate_walks << std::endl;
-                logstream(LOG_DEBUG) << "nverts = " << run_block->block->nverts << ", nedges = " << run_block->block->nedges << ", walk density = " << (real_t)approximate_walks / run_block->block->nverts << ", sampler : " << sampler->sample_name() << std::endl;
+                logstream(LOG_DEBUG) << "run time : " << gtimer.runtime() << ", run block =  " << cur_block << std::endl;
+                logstream(LOG_DEBUG) << "nverts = " << run_block->block->nverts << ", nedges = " << run_block->block->nedges << ", sampler : " << sampler->sample_name() << std::endl;
                 logstream(LOG_DEBUG) << "run_count = " << run_count << ", total walks = " << total_walks << std::endl;
 
                 driver->load_extra_meta(*cache, walk_manager->global_blocks, cache_index, cur_block, sampler->use_alias);
@@ -103,7 +101,7 @@ public:
     void epilogue(userprogram_t<AppType, AppConfig> &userprogram)
     {
         userprogram.epilogue();
-        walk_manager->mg_timer.report("out/walk_metric.txt");
+        _m.stop_time("run_app");
         logstream(LOG_INFO) << "  ================= FINISHED ======================  " << std::endl;
     }
 

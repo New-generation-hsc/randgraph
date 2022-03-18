@@ -47,7 +47,7 @@
         
     file_reporter(std::string fname) : filename(fname) {
       // Create new file
-        f = fopen(fname.c_str(), "w");
+        f = fopen(fname.c_str(), "a");
         assert(f != NULL);
     }
       

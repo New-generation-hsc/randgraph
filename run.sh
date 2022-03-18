@@ -1,37 +1,28 @@
 #!/bin/bash
 
-# DATASET="/home/hsc/dataset/twitter/twitter_rv.net"
-# DATASET="/home/hsc/dataset/twitter/w-twitter_rv.net"
-DATASET="/home/hsc/dataset/livejournal/soc-LiveJournal1.txt"
-# DATASET="/home/hsc/dataset/livejournal/w-soc-livejournal.txt"
-VERTICES=61578415
-STEPS=100
-# LENGTH=25
-LENGTH=1
-BLOCKSIZE=65536
-NMBLOCKS=6
+set -e
 
-echo "app = rawrandomwalks, dataset = $DATASET"
-echo "vertices = $VERTICES, steps = $STEPS, length = $LENGTH"
+SL_DATASET="/dataset/livejournal/soc-LiveJournal1.txt"
+TW_DATASET="/dataset/twitter/twitter_rv.net"
+CF_DATASET="/dataset/friendster/friendster.txt"
+UK_DATASET="/dataset/uk-union/uk-union.txt"
+RM27_DATASET="/dataset/rmat27/rmat27.txt"
+RM28_DATASET="/home/hsc/graphdataset/rmat28/rmat28.txt"
+
+DATASET=$SL_DATASET
+
+case $1 in
+    "SL") DATASET=$SL_DATASET;;
+    "TW") DATASET=$TW_DATASET;;
+    "CF") DATASET=$CF_DATASET;;
+    "UK") DATASET=$UK_DATASET;;
+    "RM27") DATASET=$RM27_DATASET;;
+    "RM28") DATASET=$RM28_DATASET;;
+    *) DATASET=$SL_DATASET
+esac
 
 sudo sync; sudo sh -c '/usr/bin/echo 1 > /proc/sys/vm/drop_caches'
 
-# the random command
+echo "apps = node2vec, dataset = $DATASET, length = 20, sample = reject"
 
-# ./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample its weighted length 5 walkpersource 1
-
-# ./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample opt_alias weighted length 5 walkpersource 2
-
-# ./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample opt_alias weighted length 25 walkpersource 1
-
-./bin/test/node2vec $DATASET nmblocks $NMBLOCKS sample its length 1 walkpersource 1
-
-# ./bin/test/autoregressive $DATASET nmblocks $NMBLOCKS sample its length 25 walkpersource 1
-
-# ./bin/test/pagerank $DATASET nmblocks $NMBLOCKS sample naive
-
-# ./bin/test/walk $DATASET nmblocks $NMBLOCKS sample naive walks $STEPS length $LENGTH
-
-# ./bin/test/max_degree $DATASET
-
-# ./bin/test/degree_dist $DATASET $1 $2
+./bin/test/node2vec $DATASET sample reject length 20 walkpersource 1
