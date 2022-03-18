@@ -41,7 +41,7 @@ int main(int argc, const char *argv[])
     graph_config conf = {
         base_name,
         0,
-        cache_size * 1024 * 1024,
+        cache_size * 1024LL * 1024 * 1024,
         BLOCK_SIZE,
         (tid_t)omp_get_max_threads(),
         nvertices,
