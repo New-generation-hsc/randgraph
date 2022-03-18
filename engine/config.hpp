@@ -12,6 +12,7 @@
 struct graph_config {
     std::string base_name;
     int fnum;
+    size_t cache_size;
     size_t blocksize;
     tid_t nthreads;
 

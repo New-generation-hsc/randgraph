@@ -239,7 +239,7 @@ public:
     std::vector<cache_block> cache_blocks; /* the cached blocks */
 
     graph_cache(bid_t nblocks, graph_config *conf) {
-        setup(nblocks, conf->blocksize);
+        setup(nblocks, conf->cache_size, conf->blocksize);
         for(auto & cblk : cache_blocks) cblk.make_filter(conf->filter);
     }
 
@@ -253,8 +253,8 @@ public:
         return cache_blocks[index];
     }
 
-    void setup(bid_t nblocks, size_t blocksize = BLOCK_SIZE) {
-        ncblock = min_value(nblocks, MEMORY_CACHE / blocksize);
+    void setup(bid_t nblocks, size_t cache_size, size_t blocksize = BLOCK_SIZE) {
+        ncblock = min_value(nblocks, cache_size / blocksize);
         assert(ncblock > 0);
         cache_blocks.resize(ncblock);
     }

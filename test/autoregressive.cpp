@@ -30,7 +30,8 @@ int main(int argc, const char *argv[])
     bool reordered = get_option_bool("reordered");
     bool filter = get_option_bool("filter");
     bool dynamic = get_option_bool("dynamic");
-    
+
+    size_t cache_size = get_option_int("cache", MEMORY_CACHE / (1024 * 1024));
     wid_t walks = (wid_t)get_option_int("walksource", 100000);
     hid_t steps = (hid_t)get_option_int("length", 25);
     real_t alpha = (real_t)get_option_float("alpha", 0.2);
@@ -40,6 +41,7 @@ int main(int argc, const char *argv[])
     graph_config conf = {
         base_name,
         0,
+        cache_size * 1024 * 1024,
         BLOCK_SIZE,
         (tid_t)omp_get_max_threads(),
         nvertices,
@@ -57,7 +59,7 @@ int main(int argc, const char *argv[])
     graph_driver driver(&conf, m);
 
     graph_walk<vid_t, SecondOrder> walk_mangager(conf, driver, blocks);
-    
+
     graph_cache cache(min_value(nmblocks, blocks.nblocks), &conf);
 
     second_order_param_t app_param = { alpha, (real_t)(1.0 - alpha), (real_t)(1.0 - alpha), (real_t)(1.0 - alpha)};
