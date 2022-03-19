@@ -113,10 +113,14 @@ public:
 
         _m.start_time("exec_block_walk");
         {
-            #pragma omp parallel for schedule(static)
+            wid_t run_steps = 0;
+            #pragma omp parallel for reduction(+: run_steps)
             for(wid_t idx = 0; idx < nwalks; idx++) {
-                userprogram.update_walk(walk_manager->walks[idx], cache, walk_manager, sampler, &seeds[omp_get_thread_num()], conf->dynamic);
+                run_steps += userprogram.update_walk(walk_manager->walks[idx], cache, walk_manager, sampler, &seeds[omp_get_thread_num()], conf->dynamic);
             }
+#ifdef PROF_STEPS
+            std::cout << "run_steps : " << run_steps << std::endl;
+#endif
         }
         _m.stop_time("exec_block_walk");
     }

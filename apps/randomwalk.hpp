@@ -44,10 +44,11 @@ public:
     }
 
     template <typename walk_data_t, WalkType walk_type>
-    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler, unsigned int *seed, bool dynamic)
+    wid_t update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler, unsigned int *seed, bool dynamic)
     {
         logstream(LOG_ERROR) << "you are using a generic method." << std::endl;
         // update_strategy_t<randomwalk_conf_t, walk_data_t, walk_type, SampleType>::update_walk(_conf, walker, cache, walk_manager, sampler);
+        return 0;
     }
 
     void epilogue() {  }
@@ -74,40 +75,43 @@ void randomwalk_t::prologue<empty_data_t, FirstOrder>(graph_walk<empty_data_t, F
 }
 
 template <>
-void randomwalk_t::update_walk<empty_data_t, FirstOrder>(const walker_t<empty_data_t> &walker, graph_cache *cache, graph_walk<empty_data_t, FirstOrder> *walk_manager, sample_policy_t *sampler, unsigned int *seed, bool dynamic)
+wid_t randomwalk_t::update_walk<empty_data_t, FirstOrder>(const walker_t<empty_data_t> &walker, graph_cache *cache, graph_walk<empty_data_t, FirstOrder> *walk_manager, sample_policy_t *sampler, unsigned int *seed, bool dynamic)
 {
-        // tid_t tid = (tid_t)omp_get_thread_num();
-        vid_t dst = WALKER_POS(walker);
-        hid_t hop = WALKER_HOP(walker);
-        bid_t p = walk_manager->global_blocks->get_block(dst);
-        cache_block *run_block = &(cache->cache_blocks[(*(walk_manager->global_blocks))[p].cache_index]);
+    // tid_t tid = (tid_t)omp_get_thread_num();
+    vid_t dst = WALKER_POS(walker);
+    hid_t hop = WALKER_HOP(walker);
+    bid_t p = walk_manager->global_blocks->get_block(dst);
+    cache_block *run_block = &(cache->cache_blocks[(*(walk_manager->global_blocks))[p].cache_index]);
 
-        // unsigned seed = (unsigned)(dst + hop + tid + time(NULL));
-        vid_t start_vert = run_block->block->start_vert, end_vert = run_block->block->start_vert + run_block->block->nverts;
-        while (dst >= start_vert && dst < end_vert && hop > 0)
+    // unsigned seed = (unsigned)(dst + hop + tid + time(NULL));
+    vid_t start_vert = run_block->block->start_vert, end_vert = run_block->block->start_vert + run_block->block->nverts;
+    wid_t run_step = 0;
+    while (dst >= start_vert && dst < end_vert && hop > 0)
+    {
+        vid_t off = dst - start_vert;
+        eid_t adj_head = run_block->beg_pos[off] - run_block->block->start_edge, adj_tail = run_block->beg_pos[off + 1] - run_block->block->start_edge;
+        if (run_block->weights == NULL)
         {
-            vid_t off = dst - start_vert;
-            eid_t adj_head = run_block->beg_pos[off] - run_block->block->start_edge, adj_tail = run_block->beg_pos[off + 1] - run_block->block->start_edge;
-            if (run_block->weights == NULL)
-            {
-                walk_context<UNBAISEDCONTEXT> ctx(dst, walk_manager->nvertices, run_block->csr + adj_head, run_block->csr + adj_tail, seed, _conf.teleport);
-                dst = vertex_sample(ctx, sampler, nullptr, dynamic);
-            }
-            else
-            {
-                walk_context<BIASEDCONTEXT> ctx(dst, walk_manager->nvertices, run_block->csr + adj_head, run_block->csr + adj_tail, seed, run_block->weights + adj_head, run_block->weights + adj_tail, _conf.teleport);
-                dst = vertex_sample(ctx, sampler, nullptr, dynamic);
-            }
-            hop--;
+            walk_context<UNBAISEDCONTEXT> ctx(dst, walk_manager->nvertices, run_block->csr + adj_head, run_block->csr + adj_tail, seed, _conf.teleport);
+            dst = vertex_sample(ctx, sampler, nullptr, dynamic);
         }
+        else
+        {
+            walk_context<BIASEDCONTEXT> ctx(dst, walk_manager->nvertices, run_block->csr + adj_head, run_block->csr + adj_tail, seed, run_block->weights + adj_head, run_block->weights + adj_tail, _conf.teleport);
+            dst = vertex_sample(ctx, sampler, nullptr, dynamic);
+        }
+        hop--;
+        run_step++;
+    }
 
-        if (hop > 0)
-        {
-            bid_t blk = walk_manager->global_blocks->get_block(dst);
-            assert(blk < walk_manager->global_blocks->nblocks);
-            walker_t<empty_data_t> next_walker = walker_makeup(WALKER_ID(walker), WALKER_SOURCE(walker), dst, hop);
-            walk_manager->move_walk(next_walker);
-            walk_manager->set_max_hop(next_walker);
-        }
+    if (hop > 0)
+    {
+        bid_t blk = walk_manager->global_blocks->get_block(dst);
+        assert(blk < walk_manager->global_blocks->nblocks);
+        walker_t<empty_data_t> next_walker = walker_makeup(WALKER_ID(walker), WALKER_SOURCE(walker), dst, hop);
+        walk_manager->move_walk(next_walker);
+        walk_manager->set_max_hop(next_walker);
+    }
+    return run_step;
 }
 #endif
