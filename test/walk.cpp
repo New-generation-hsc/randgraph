@@ -23,7 +23,7 @@ int main(int argc, const char* argv[]) {
     /* graph meta info */
     vid_t nvertices;
     eid_t nedges;
-    size_t cache_size = get_option_int("cache", MEMORY_CACHE / (1024 * 1024));
+    size_t cache_size = get_option_int("cache", MEMORY_CACHE / (1024LL * 1024 * 1024));
     bool weighted = get_option_bool("weighted");
     load_graph_meta(base_name, &nvertices, &nedges, weighted);
 
