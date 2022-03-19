@@ -779,7 +779,7 @@ private:
             if(cache.cache_blocks[pos].block != NULL) {
                 cache.cache_blocks[pos].block->cache_index = nblocks;
             }
-            std::cout << "load block info, blk = " << blk << " -> cache_index = " << pos << std::endl;
+            // std::cout << "load block info, blk = " << blk << " -> cache_index = " << pos << std::endl;
             driver.load_block_info(cache, walk_manager.global_blocks, pos, blk);
             pos++;
         }

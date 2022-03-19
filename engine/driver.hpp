@@ -79,6 +79,9 @@ public:
     void load_block_info(graph_cache &cache, graph_block *global_blocks, bid_t cache_index, bid_t block_index)
     {
         _m.start_time("load_block_info");
+#ifdef PROF_STEPS
+        std::cout << "run_steps_load_block_info" << std::endl;
+#endif
         cache.cache_blocks[cache_index].block = &global_blocks->blocks[block_index];
         cache.cache_blocks[cache_index].block->status = ACTIVE;
         cache.cache_blocks[cache_index].block->cache_index = cache_index;

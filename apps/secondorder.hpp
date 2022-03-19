@@ -59,9 +59,10 @@ public:
     }
 
     template <typename walk_data_t, WalkType walk_type>
-    void update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler, unsigned int *seed, bool dynamic)
+    wid_t update_walk(const walker_t<walk_data_t> &walker, graph_cache *cache, graph_walk<walk_data_t, walk_type> *walk_manager, sample_policy_t *sampler, unsigned int *seed, bool dynamic)
     {
         logstream(LOG_ERROR) << "you are using a generic method." << std::endl;
+        return 0;
     }
 
     void epilogue()
@@ -111,7 +112,7 @@ void second_order_app_t::prologue<vid_t, SecondOrder>(graph_walk<vid_t, SecondOr
 }
 
 template <>
-void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &walker, graph_cache *cache, graph_walk<vid_t, SecondOrder> *walk_manager, sample_policy_t *sampler, unsigned int *seed, bool dynamic)
+wid_t second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &walker, graph_cache *cache, graph_walk<vid_t, SecondOrder> *walk_manager, sample_policy_t *sampler, unsigned int *seed, bool dynamic)
 {
     // tid_t tid = (tid_t)omp_get_thread_num();
     vid_t cur_vertex = WALKER_POS(walker), prev_vertex = get_vertex_from_walk(walker.data);
@@ -124,6 +125,7 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
     assert(cur_cache_index != nblocks && prev_cache_index != nblocks);
 
     wtimer.start_time("walker_update");
+    wid_t run_step = 0;
     while (cur_cache_index != nblocks && hop > 0)
     {
         cache_block *cur_block = &(cache->cache_blocks[cur_cache_index]);
@@ -179,6 +181,7 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
             cur_cache_index = (*(walk_manager->global_blocks))[cur_blk].cache_index;
         }
         hop--;
+        run_step++;
     }
     wtimer.stop_time("walker_update");
 
@@ -188,6 +191,7 @@ void second_order_app_t::update_walk<vid_t, SecondOrder>(const walker_t<vid_t> &
         walk_manager->move_walk(next_walker);
         walk_manager->set_max_hop(next_walker);
     }
+    return run_step;
 }
 
 #endif
