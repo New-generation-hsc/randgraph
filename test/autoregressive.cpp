@@ -31,7 +31,7 @@ int main(int argc, const char *argv[])
     bool filter = get_option_bool("filter");
     bool dynamic = get_option_bool("dynamic");
 
-    size_t cache_size = get_option_int("cache", MEMORY_CACHE / (1024 * 1024));
+    size_t cache_size = get_option_int("cache", MEMORY_CACHE / (1024LL * 1024 * 1024));
     wid_t walks = (wid_t)get_option_int("walksource", 100000);
     hid_t steps = (hid_t)get_option_int("length", 25);
     real_t alpha = (real_t)get_option_float("alpha", 0.2);
