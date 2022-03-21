@@ -22,6 +22,12 @@ public:
     // statistic metric
     metrics &_m;
 
+#ifdef PROF_STEPS
+    size_t total_times;
+    double sum_avg_steps;
+#endif
+    
+
     graph_engine(graph_cache& _cache, graph_walk<walk_data_t, walk_type>& manager, graph_driver& _driver, graph_config& _conf, metrics &m) : _m(m){
         cache         = &_cache;
         walk_manager = &manager;
@@ -31,6 +37,12 @@ public:
         for(tid_t tid = 0; tid < conf->nthreads; tid++) {
             seeds[tid] = time(NULL) + tid;
         }
+
+#ifdef PROF_STEPS
+        total_times = 0;
+        sum_avg_steps = 0.0;
+#endif
+
     }
 
     template <typename AppType, typename AppConfig>
@@ -90,6 +102,9 @@ public:
     {
         userprogram.epilogue();
         _m.stop_time("run_app");
+#ifdef PROF_STEPS
+        std::cout << "each walk step : " << sum_avg_steps / total_times << std::endl;
+#endif
         logstream(LOG_INFO) << "  ================= FINISHED ======================  " << std::endl;
     }
 
@@ -107,6 +122,8 @@ public:
                 run_steps += userprogram.update_walk(walk_manager->walks[idx], cache, walk_manager, sampler, &seeds[omp_get_thread_num()], conf->dynamic);
             }
 #ifdef PROF_STEPS
+            total_times++;
+            sum_avg_steps += (double)run_steps / nwalks;
             std::cout << "run_steps : " << run_steps << std::endl;
 #endif
         }

@@ -666,10 +666,17 @@ private:
             }
         }
 
+#ifdef EXPECT_SCHEDULE
         auto cmp = [&partition_walks, &walk_manager](bid_t u, bid_t v)
         {
             return (*walk_manager.global_blocks)[u].exp_walk_len * partition_walks[u] > (*walk_manager.global_blocks)[v].exp_walk_len * partition_walks[v];
         };
+#else
+        auto cmp = [&partition_walks, &walk_manager](bid_t u, bid_t v)
+        {
+            return partition_walks[u] > partition_walks[v];
+        };
+#endif
 
         std::vector<bid_t> block_indexs(nblocks, 0);
         std::iota(block_indexs.begin(), block_indexs.end(), 0);
@@ -701,6 +708,7 @@ private:
         //     return nwalks;
         // };
 
+#ifdef EXPECT_SCHEDULE
         auto cal_score = [&block_walks, &walk_manager, nblocks](const std::vector<bid_t>& blocks) {
             wid_t score = 0;
             for(auto p_blk : blocks) {
@@ -710,6 +718,17 @@ private:
             }
             return score;
         };
+#else
+        auto cal_score = [&block_walks, &walk_manager, nblocks](const std::vector<bid_t>& blocks) {
+            wid_t score = 0;
+            for(auto p_blk : blocks) {
+                for(auto c_blk : blocks) {
+                    score += block_walks[p_blk * nblocks + c_blk];
+                }
+            }
+            return score;
+        };
+#endif
 
         if(cache.ncblock < nblocks) {
             // real_t T = 100.0, alpha = 0.2;
