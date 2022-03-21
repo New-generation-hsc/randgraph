@@ -29,14 +29,22 @@ RM28_DATASET="/home/hsc/graphdataset/rmat28/rmat28.txt"
 #     ./bin/test/node2vec $DATASET sample reject length 20 walkpersource 1
 # done
 
-for DATASET in $SL_DATASET $TW_DATASET $CF_DATASET $UK_DATASET $RM27_DATASET $RM28_DATASET
-do
-    echo "apps = autoregressive, dataset = $DATASET, length = 20, sample = reject"
-    ./bin/test/autoregressive $DATASET sample its length 20 walksource 1000000
-done
+# for DATASET in $SL_DATASET $TW_DATASET $CF_DATASET $UK_DATASET $RM27_DATASET $RM28_DATASET
+# do
+#     echo "apps = autoregressive, dataset = $DATASET, length = 20, sample = reject"
+#     ./bin/test/autoregressive $DATASET sample its length 20 walksource 1000000
+# done
 
 # for CACHE in 1 2 4 6 8 10
 # do
 #     echo "apps = node2vec, dataset = $CF_DATASET, length = 20, sample = reject, cache_size = $CACHE"
 #     ./bin/test/node2vec $CF_DATASET sample reject length 20 walkpersource 1 cache $CACHE
 # done
+
+for ITER in 20 30 40 50 60 70 80 90 100 110 120 130
+do
+    echo "apps = node2vec, dataset = $CF_DATASET, length = 20, sample = reject"
+    # ./bin/test/node2vec $CF_DATASET sample reject length 20 walkpersource 1 iter $ITER
+
+    ./bin/test/node2vec $RM28_DATASET sample reject length 20 walkpersource 1 iter $ITER
+done

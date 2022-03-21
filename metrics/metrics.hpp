@@ -165,10 +165,12 @@ class metrics {
   std::string name, ident;
   std::map<std::string, metrics_entry> entries;
     mutex mlock;
+  size_t max_iter;
 
 public:
   inline metrics(std::string _name = "", std::string _id = "") : name(_name), ident (_id) {
       this->set("app", _name);
+      max_iter = 30;
   }
 
   inline void clear() {
@@ -331,6 +333,10 @@ public:
             reporter.do_report(name, ident, entries);
         }
     }
+  
+  inline void set_max_iter(size_t iter) { max_iter = iter; }
+
+  inline size_t get_max_iter() { return max_iter; }
 
 };
 

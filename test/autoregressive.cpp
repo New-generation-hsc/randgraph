@@ -30,6 +30,7 @@ int main(int argc, const char *argv[])
     bool reordered = get_option_bool("reordered");
     bool filter = get_option_bool("filter");
     bool dynamic = get_option_bool("dynamic");
+    size_t max_iter = get_option_int("iter", 30);
 
     size_t cache_size = get_option_int("cache", MEMORY_CACHE / (1024LL * 1024 * 1024));
     wid_t walks = (wid_t)get_option_int("walksource", 100000);
@@ -56,6 +57,7 @@ int main(int argc, const char *argv[])
     bid_t nmblocks = get_option_int("nmblocks", blocks.nblocks);
 
     metrics m("autoregressive_walksource_" + std::to_string(walks) + "_steps_" + std::to_string(steps) + "_dataset_" + argv[1]);
+    m.set_max_iter(max_iter);
     graph_driver driver(&conf, m);
 
     graph_walk<vid_t, SecondOrder> walk_mangager(conf, driver, blocks);

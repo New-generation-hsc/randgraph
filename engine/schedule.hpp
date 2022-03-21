@@ -639,7 +639,7 @@ class simulated_annealing_scheduler_t : public base_scheduler
 private:
     std::vector<bid_t> bucket_sequences;
     std::vector<bid_t> buckets;
-    size_t index;
+    size_t index, max_iter;
 
 
     template <typename walk_data_t, WalkType walk_type>
@@ -732,7 +732,7 @@ private:
 
         if(cache.ncblock < nblocks) {
             // real_t T = 100.0, alpha = 0.2;
-            size_t max_iter = 30, iter = 0;
+            size_t iter = 0;
             size_t can_comm = 0;
             // wid_t can_nwalks = cal_nwalks(candidate_blocks);
             for(auto blk : candidate_blocks) if(cache_blocks.find(blk) != cache_blocks.end()) can_comm++;
@@ -819,6 +819,8 @@ public:
     simulated_annealing_scheduler_t(metrics &m) : base_scheduler(m)
     {
         index = 0;
+        max_iter = m.get_max_iter();
+        std::cout << "max_iter : " << max_iter << std::endl;
     }
 
     template <typename walk_data_t, WalkType walk_type>
