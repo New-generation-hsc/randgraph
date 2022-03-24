@@ -54,7 +54,7 @@ int main(int argc, const char *argv[])
     };
 
     graph_block blocks(&conf);
-    metrics m("node2vec_walkpersource_" + std::to_string(walks) + "_steps_" + std::to_string(steps) + "_dataset_" + argv[1]);
+    metrics m("node2vec_walkpersource_" + std::to_string(walks) + "_steps_" + std::to_string(steps) + "_dataset_" + argv[1] + "_iter_" + std::to_string(max_iter));
     m.set_max_iter(max_iter);
     graph_driver driver(&conf, m);
 
