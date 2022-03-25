@@ -3,7 +3,7 @@ CC = g++
 INCLUDE = -I.
 FLAGS = -std=c++11 -lpthread -lortools -fopenmp -Wall -D FASTSKIP -D EXPECT_SCHEDULE
 
-apps : test/preprocess test/walk test/test_sample test/node2vec test/autoregressive test/gen test/pagerank test/max_degree test/degree_dist test/reorder
+apps : test/preprocess test/walk test/test_sample test/node2vec test/autoregressive test/gen test/pagerank test/max_degree test/degree_dist test/reorder test/model
 
 test/% : test/%.cpp
 	@mkdir -p bin/$(@D)

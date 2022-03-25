@@ -1,18 +1,35 @@
 #include <iostream>
 #include <numeric>
 #include <vector>
+#include <unordered_map>
 
 #include <ortools/linear_solver/linear_expr.h>
 #include <ortools/linear_solver/linear_solver.h>
 
+struct Edge_t { 
+    size_t src, dst;
+    double w;
+};
+
+// struct DataModel {
+//     const std::vector<Edge_t>& edges;
+//     const std::vector<size_t>& verts;
+//     const size_t num_vert;
+//     const size_t num_edge;
+//     const size_t num_cache;
+
+//     DataModel(const std::vector<Edge_t> &v_edges, const std::vector<size_t> &v_verts, size_t n_vert, size_t n_edge, size_t n_cache) : edges(v_edges), verts(v_verts), num_vert(n_vert), num_edge(n_edge), num_cache(n_cache) {}
+//     DataModel(const std::vector<Edge_t> &&v_edges, const std::vector<size_t> &&v_verts, size_t n_vert, size_t n_edge, size_t n_cache) = delete;
+// };
+
 struct DataModel {
-    const std::vector<double>& weights;
+    const std::vector<Edge_t>& edges;
     const size_t num_vert;
     const size_t num_edge;
     const size_t num_cache;
 
-    DataModel(const std::vector<double> & v_weights, size_t n_vert, size_t n_edge, size_t n_cache) : weights(v_weights), num_vert(n_vert), num_edge(n_edge), num_cache(n_cache)  {}
-    DataModel(const std::vector<double> && v_weights, size_t n_vert, size_t n_edge, size_t n_cache) = delete;
+    DataModel(const std::vector<Edge_t> &v_edges, size_t n_vert, size_t n_edge, size_t n_cache) : edges(v_edges), num_vert(n_vert), num_edge(n_edge), num_cache(n_cache) {}
+    DataModel(const std::vector<Edge_t> &&v_edges, size_t n_vert, size_t n_edge, size_t n_cache) = delete;
 };
 
 namespace operations_research
@@ -48,14 +65,14 @@ namespace operations_research
 
         for (size_t i = 0; i < data.num_edge; i++)
         {
-            solver->MakeRowConstraint(LinearExpr(v_e[i]) <= LinearExpr(v_v[i % data.num_vert]));
-            solver->MakeRowConstraint(LinearExpr(v_e[i]) <= LinearExpr(v_v[i / data.num_vert]));
+            solver->MakeRowConstraint(LinearExpr(v_e[i]) <= LinearExpr(v_v[data.edges[i].src]));
+            solver->MakeRowConstraint(LinearExpr(v_e[i]) <= LinearExpr(v_v[data.edges[i].dst]));
         }
 
         LinearExpr object_expr;
         for (size_t i = 0; i < data.num_edge; i++)
         {
-            object_expr += data.weights[i] * LinearExpr(v_e[i]);
+            object_expr += data.edges[i].w * LinearExpr(v_e[i]);
         }
 
         MPObjective *const objective = solver->MutableObjective();

@@ -1,7 +1,7 @@
 from sys import stdin
 
-steps = 1000000 * 20
-# steps = 124836180 * 20
+# steps = 1000000 * 20
+steps = 124836180 * 20
 load = 0
 walk_step = 0
 

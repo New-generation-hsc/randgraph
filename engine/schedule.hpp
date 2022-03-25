@@ -871,14 +871,50 @@ private:
             block_walks[blk] = walk_manager.nblockwalks(blk);
         }
 
-        std::vector<double> block_weights(nblocks * nblocks, 0.0);
+        std::vector<Edge_t> edges;
+        // std::unordered_map<size_t, size_t> vert_map;
+        // std::vector<size_t> verts;
 #ifdef EXPECT_SCHEDULE
-        for (bid_t blk = 0; blk < nblocks * nblocks; blk++) {
-            block_weights[blk] = block_walks[blk] * (*walk_manager.global_blocks)[blk % nblocks].exp_walk_len;
+        for (bid_t blk = 0; blk < nblocks * nblocks; blk++)
+        {
+            // block_weights[blk] = block_walks[blk] * (*walk_manager.global_blocks)[blk % nblocks].exp_walk_len;
+            if (block_walks[blk] > 0)
+            {
+                // if(vert_map.find(blk / nblocks) == vert_map.end()) {
+                //     vert_map[blk / nblocks] = verts.size();
+                //     verts.push_back(blk / nblocks);
+                // }
+
+                // if(vert_map.find(blk % nblocks) == vert_map.end()) {
+                //     vert_map[blk % nblocks] = verts.size();
+                //     verts.push_back(blk % nblocks);
+                // }
+
+                // Edge_t edge = {vert_map[blk / nblocks], vert_map[blk % nblocks], block_walks[blk] * (*walk_manager.global_blocks)[blk % nblocks].exp_walk_len};
+                Edge_t edge = {blk / nblocks, blk % nblocks, block_walks[blk] * (*walk_manager.global_blocks)[blk % nblocks].exp_walk_len};
+                edges.push_back(edge);
+            }
         }
 #else
-        for (bid_t blk = 0; blk < nblocks * nblocks; blk++) {
-            block_weights[blk] = block_walks[blk];
+        for (bid_t blk = 0; blk < nblocks * nblocks; blk++)
+        {
+            // block_weights[blk] = block_walks[blk];
+            if (block_walks[blk] > 0)
+            {
+                // if(vert_map.find(blk / nblocks) == vert_map.end()) {
+                //     vert_map[blk / nblocks] = verts.size();
+                //     verts.push_back(blk / nblocks);
+                // }
+
+                // if(vert_map.find(blk % nblocks) == vert_map.end()) {
+                //     vert_map[blk % nblocks] = verts.size();
+                //     verts.push_back(blk % nblocks);
+                // }
+
+                // Edge_t edge = {vert_map[blk / nblocks], vert_map[blk % nblocks], block_walks[blk]};
+                Edge_t edge = {blk / nblocks, blk % nblocks, block_walks[blk]};
+                edges.push_back(edge);
+            }
         }
 #endif
 
@@ -886,9 +922,13 @@ private:
         std::vector<bid_t> block_indexs(nblocks, 0);
         std::iota(block_indexs.begin(), block_indexs.end(), 0);
 
-        DataModel data(block_weights, nblocks, nblocks * nblocks, cache.ncblock);
-        std::vector<bool> ans_blocks(nblocks);
-        if (operations_research::lp_solve_schedule(data, ans_blocks)) {
+        // DataModel data(edges, verts, verts.size(), edges.size(), cache.ncblock);
+        DataModel data(edges, nblocks, edges.size(), cache.ncblock);
+        std::vector<bool> ans_blocks(nblocks, false);
+        _m.start_time("lp_solve_schedule");
+        bool success = operations_research::lp_solve_schedule(data, ans_blocks);
+        _m.stop_time("lp_solve_schedule");
+        if (success) {
             size_t idx = 0;
             for(bid_t blk = 0; blk < nblocks; blk++) {
                 if(ans_blocks[blk]) {
@@ -1091,6 +1131,230 @@ private:
 
 public:
     lp_solver_scheduler_t(metrics &m) : base_scheduler(m)
+    {
+        index = 0;
+        max_iter = m.get_max_iter();
+        std::cout << "max_iter : " << max_iter << std::endl;
+    }
+
+    template <typename walk_data_t, WalkType walk_type>
+    bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager)
+    {
+        _m.start_time("simulated_annealing_scheduler_swap_blocks");
+        if (index == bucket_sequences.size())
+        {
+            bucket_sequences.clear();
+            buckets.clear();
+            choose_blocks(cache, driver, walk_manager);
+            for (auto blk : buckets)
+                std::cout << blk << " ";
+            std::cout << std::endl;
+            index = 0;
+        }
+        _m.stop_time("simulated_annealing_scheduler_swap_blocks");
+        return bucket_sequences[index++];
+    }
+};
+
+/**
+ * The following scheduler is the surfer scheduler
+ * the scheduler selects one block at first, if the total walks is less than 1000, then choose two blocks
+ */
+class lp_solver_without_sa_scheduler_t : public base_scheduler
+{
+private:
+    std::vector<bid_t> bucket_sequences;
+    std::vector<bid_t> buckets;
+    size_t index, max_iter;
+
+    template <typename walk_data_t, WalkType walk_type>
+    void choose_blocks(graph_cache &cache, graph_walk<walk_data_t, walk_type> &walk_manager) {}
+
+    void choose_blocks(graph_cache &cache, graph_driver &driver, graph_walk<vid_t, SecondOrder> &walk_manager)
+    {
+        std::unordered_set<bid_t> cache_blocks;
+        for (bid_t blk = 0; blk < cache.ncblock; blk++)
+        {
+            if (cache.cache_blocks[blk].block != NULL)
+                cache_blocks.insert(cache.cache_blocks[blk].block->blk);
+        }
+
+        bid_t nblocks = walk_manager.nblocks;
+        std::vector<wid_t> block_walks(nblocks * nblocks);
+        for (bid_t blk = 0; blk < nblocks * nblocks; blk++)
+        {
+            block_walks[blk] = walk_manager.nblockwalks(blk);
+        }
+
+        std::vector<Edge_t> edges;
+        // std::unordered_map<size_t, size_t> vert_map;
+        // std::vector<size_t> verts;
+#ifdef EXPECT_SCHEDULE
+        for (bid_t blk = 0; blk < nblocks * nblocks; blk++) {
+            // block_weights[blk] = block_walks[blk] * (*walk_manager.global_blocks)[blk % nblocks].exp_walk_len;
+            if(block_walks[blk] > 0) {
+                // if(vert_map.find(blk / nblocks) == vert_map.end()) {
+                //     vert_map[blk / nblocks] = verts.size();
+                //     verts.push_back(blk / nblocks);
+                // }
+
+                // if(vert_map.find(blk % nblocks) == vert_map.end()) {
+                //     vert_map[blk % nblocks] = verts.size();
+                //     verts.push_back(blk % nblocks);
+                // }
+
+                // Edge_t edge = {vert_map[blk / nblocks], vert_map[blk % nblocks], block_walks[blk] * (*walk_manager.global_blocks)[blk % nblocks].exp_walk_len};
+                Edge_t edge = {blk / nblocks, blk % nblocks, block_walks[blk] * (*walk_manager.global_blocks)[blk % nblocks].exp_walk_len};
+                edges.push_back(edge);
+            }
+        }
+#else
+        for (bid_t blk = 0; blk < nblocks * nblocks; blk++) {
+            // block_weights[blk] = block_walks[blk];
+            if(block_walks[blk] > 0) {
+                // if(vert_map.find(blk / nblocks) == vert_map.end()) {
+                //     vert_map[blk / nblocks] = verts.size();
+                //     verts.push_back(blk / nblocks);
+                // }
+
+                // if(vert_map.find(blk % nblocks) == vert_map.end()) {
+                //     vert_map[blk % nblocks] = verts.size();
+                //     verts.push_back(blk % nblocks);
+                // }
+
+                // Edge_t edge = {vert_map[blk / nblocks], vert_map[blk % nblocks], block_walks[blk]};
+                Edge_t edge = {blk / nblocks, blk % nblocks, block_walks[blk]};
+                edges.push_back(edge);
+            }
+        }
+#endif
+
+        std::vector<bid_t> candidate_blocks(cache.ncblock);
+        std::vector<bid_t> block_indexs(nblocks, 0);
+        std::iota(block_indexs.begin(), block_indexs.end(), 0);
+
+        // DataModel data(edges, verts, verts.size(), edges.size(), cache.ncblock);
+        DataModel data(edges, nblocks, edges.size(), cache.ncblock);
+        std::vector<bool> ans_blocks(nblocks);
+        _m.start_time("lp_solve_schedule");
+        bool success = operations_research::lp_solve_schedule(data, ans_blocks);
+        _m.stop_time("lp_solve_schedule");
+        if (success)
+        {
+            size_t idx = 0;
+            for (bid_t blk = 0; blk < nblocks; blk++)
+            {
+                if (ans_blocks[blk])
+                {
+                    candidate_blocks[idx] = blk;
+                    std::swap(block_indexs[idx], block_indexs[blk]);
+                    idx++;
+                }
+            }
+            logstream(LOG_DEBUG) << "using lp_solve_schedule to solve partition scheduling" << std::endl;
+        }
+        else
+        {
+            logstream(LOG_DEBUG) << "using simulated_annealing to solve partition scheduling" << std::endl;
+            std::vector<wid_t> partition_walks(nblocks, 0);
+            for (bid_t p_blk = 0; p_blk < nblocks; p_blk++)
+            {
+                for (bid_t c_blk = 0; c_blk < nblocks; c_blk++)
+                {
+                    partition_walks[p_blk] += block_walks[p_blk * nblocks + c_blk];
+                    if (p_blk != c_blk)
+                        partition_walks[p_blk] += block_walks[c_blk * nblocks + p_blk];
+                }
+            }
+
+#ifdef EXPECT_SCHEDULE
+            auto cmp = [&partition_walks, &walk_manager](bid_t u, bid_t v)
+            {
+                return (*walk_manager.global_blocks)[u].exp_walk_len * partition_walks[u] > (*walk_manager.global_blocks)[v].exp_walk_len * partition_walks[v];
+            };
+#else
+            auto cmp = [&partition_walks, &walk_manager](bid_t u, bid_t v)
+            {
+                return partition_walks[u] > partition_walks[v];
+            };
+#endif
+
+            std::sort(block_indexs.begin(), block_indexs.end(), cmp);
+
+            wid_t most_nwalks = 0;
+            bid_t best_index = cache.ncblock - 1;
+            for (bid_t p_index = cache.ncblock - 1; p_index < nblocks; p_index++)
+            {
+                wid_t nwalks = 0;
+                for (bid_t c_index = 0; c_index < cache.ncblock - 1; c_index++)
+                {
+                    nwalks += block_walks[block_indexs[p_index] * nblocks + block_indexs[c_index]] + block_walks[block_indexs[c_index] * nblocks + block_indexs[p_index]];
+                }
+                if (nwalks > most_nwalks)
+                {
+                    best_index = p_index;
+                    most_nwalks = nwalks;
+                }
+            }
+            std::swap(block_indexs[cache.ncblock - 1], block_indexs[best_index]);
+            for (bid_t blk = 0; blk < cache.ncblock; blk++)
+                candidate_blocks[blk] = block_indexs[blk];
+        }
+
+        buckets = candidate_blocks;
+        std::unordered_set<bid_t> bucket_uncached, bucket_cached;
+
+        for (bid_t blk = 0; blk < buckets.size(); blk++)
+        {
+            if (cache_blocks.find(buckets[blk]) != cache_blocks.end())
+            {
+                bucket_cached.insert(buckets[blk]);
+            }
+            else
+            {
+                bucket_uncached.insert(buckets[blk]);
+            }
+        }
+
+        size_t pos = 0;
+        for (auto blk : bucket_cached)
+        {
+            bid_t cache_index = (*(walk_manager.global_blocks))[blk].cache_index;
+            swap(cache.cache_blocks[pos], cache.cache_blocks[cache_index]);
+            cache.cache_blocks[pos].block->cache_index = pos;
+            cache.cache_blocks[cache_index].block->cache_index = cache_index;
+            std::cout << "swap block info, blk = " << blk << ", from " << cache_index << " to " << pos << std::endl;
+            pos++;
+        }
+
+        for (auto blk : bucket_uncached)
+        {
+            if (cache.cache_blocks[pos].block != NULL)
+            {
+                cache.cache_blocks[pos].block->cache_index = nblocks;
+            }
+            // std::cout << "load block info, blk = " << blk << " -> cache_index = " << pos << std::endl;
+            driver.load_block_info(cache, walk_manager.global_blocks, pos, blk);
+            pos++;
+        }
+
+        std::cout << "bucket sequence : ";
+        for (auto p_blk : buckets)
+        {
+            for (auto c_blk : buckets)
+            {
+                if (block_walks[p_blk * nblocks + c_blk] > 0)
+                {
+                    std::cout << p_blk << " -> " << c_blk << ", ";
+                    bucket_sequences.push_back(p_blk * nblocks + c_blk);
+                }
+            }
+        }
+        std::cout << std::endl;
+    }
+
+public:
+    lp_solver_without_sa_scheduler_t(metrics &m) : base_scheduler(m)
     {
         index = 0;
         max_iter = m.get_max_iter();

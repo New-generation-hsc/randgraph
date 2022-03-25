@@ -3,12 +3,28 @@
 int main(int argc, char **argv)
 {
     // std::vector<double> weights = {0, 0, 3, 2, 0, 0, 1, 4, 1, 2, 0, 6, 4, 3, 5, 0};
-    std::vector<double> weights = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0};
+    // std::vector<double> weights = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0};
+    std::vector<Edge_t> edges = {
+        {0, 2, 3},
+        {0, 3, 2},
+        {1, 2, 1},
+        {1, 3, 4},
+        {2, 0, 1},
+        {2, 1, 2},
+        {2, 3, 6},
+        {3, 0, 4},
+        {3, 1, 3},
+        {3, 2, 5}
+    };
+
     int num_vert = 4;
-    int num_edge = 16;
+    int num_edge = 10;
     int num_cache = 2;
 
-    DataModel data(weights, num_vert, num_edge, num_cache);
+    std::vector<size_t> verts = {0, 1, 2, 3};
+
+    // DataModel data(edges, verts, num_vert, num_edge, num_cache);
+    DataModel data(edges, num_vert, num_edge, num_cache);
     std::vector<bool> ans(num_vert);
     bool ret = operations_research::lp_solve_schedule(data, ans);
     if(ret) {
