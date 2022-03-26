@@ -99,7 +99,7 @@ int main(int argc, const char *argv[])
 
     logstream(LOG_INFO) << "sample policy : " << sampler->sample_name() << std::endl;
 
-    scheduler<lp_solver_scheduler_t> walk_scheduler(m);
+    scheduler<simulated_annealing_scheduler_t> walk_scheduler(m);
     // complex_sample_context_t sample_context(sampler, &its_sampler);
     // naive_sample_context_t sample_context(sampler);
 
