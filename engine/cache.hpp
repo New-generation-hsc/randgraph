@@ -237,6 +237,7 @@ class graph_cache {
 public:
     bid_t ncblock;                  /* number of cache blocks */
     std::vector<cache_block> cache_blocks; /* the cached blocks */
+    std::vector<bid_t> walk_blocks;
 
     graph_cache(bid_t nblocks, graph_config *conf) {
         setup(nblocks, conf->cache_size, conf->blocksize);

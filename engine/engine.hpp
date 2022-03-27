@@ -72,26 +72,50 @@ public:
             wid_t total_walks = walk_manager->nwalks();
             logstream(LOG_DEBUG) << "run time : " << gtimer.runtime() << std::endl;
             logstream(LOG_DEBUG) << "run_count = " << run_count << ", total walks = " << total_walks << std::endl;
-            // if(total_walks <= 1000000) {
-            //     driver->set_filter(false);
-            //     walk_manager->load_bf = false;
-            // }
-            bid_t select_block = block_scheduler->schedule(*cache, *driver, *walk_manager);
+            cache->walk_blocks.clear();
+            block_scheduler->schedule(*cache, *driver, *walk_manager);
             // exec_block(userprogram, select_block, sampler_context, run_count, total_walks);
             
-            wid_t nwalks = walk_manager->load_memory_walks(select_block);
-            logstream(LOG_DEBUG) << "load memory walks from " << select_block / nblocks << " to " << select_block % nblocks << ", walks = " << nwalks << std::endl;
-            update_walk(userprogram, nwalks, sampler);
-            wid_t num_disk_walks = walk_manager->ndwalks(select_block), disk_load_walks = 0;
-            while(num_disk_walks > 0){
-                wid_t interval_walks = std::min(num_disk_walks, interval_max_walks);
-                num_disk_walks -= interval_walks;
-                nwalks = walk_manager->load_disk_walks(select_block, interval_walks, disk_load_walks);
-                disk_load_walks += interval_walks;
+            // wid_t nwalks = walk_manager->load_memory_walks(select_block);
+            // logstream(LOG_DEBUG) << "load memory walks from " << select_block / nblocks << " to " << select_block % nblocks << ", walks = " << nwalks << std::endl;
+            // update_walk(userprogram, nwalks, sampler);
+            // wid_t num_disk_walks = walk_manager->ndwalks(select_block), disk_load_walks = 0;
+            // while(num_disk_walks > 0){
+            //     wid_t interval_walks = std::min(num_disk_walks, interval_max_walks);
+            //     num_disk_walks -= interval_walks;
+            //     nwalks = walk_manager->load_disk_walks(select_block, interval_walks, disk_load_walks);
+            //     disk_load_walks += interval_walks;
+            //     update_walk(userprogram, nwalks, sampler);
+            //     logstream(LOG_DEBUG) << "load disk walks from " << select_block / nblocks << " to " << select_block % nblocks << ", walks = " << nwalks << std::endl;
+            // }
+            // walk_manager->dump_walks(select_block);
+            size_t pos = 0;
+            logstream(LOG_DEBUG) << "cache walk block size : " << cache->walk_blocks.size() << std::endl;
+            while(pos < cache->walk_blocks.size()) {
+                wid_t nwalks = 0;
+                walk_manager->walks.clear();
+                while(pos < cache->walk_blocks.size() && nwalks + walk_manager->nmwalks(cache->walk_blocks[pos]) <= interval_max_walks) {
+                    nwalks += walk_manager->nmwalks(cache->walk_blocks[pos]);
+                    walk_manager->load_memory_walks(cache->walk_blocks[pos]);
+                    pos++;
+                }
                 update_walk(userprogram, nwalks, sampler);
-                logstream(LOG_DEBUG) << "load disk walks from " << select_block / nblocks << " to " << select_block % nblocks << ", walks = " << nwalks << std::endl;
+                logstream(LOG_DEBUG) << "load memory walks, pos = " << pos << ", walks = " << nwalks << std::endl;
             }
-            walk_manager->dump_walks(select_block);
+            pos = 0;
+            while (pos < cache->walk_blocks.size()) {
+                wid_t num_disk_walks = walk_manager->ndwalks(cache->walk_blocks[pos]), disk_load_walks = 0;
+                while(num_disk_walks > 0){
+                    wid_t interval_walks = std::min(num_disk_walks, interval_max_walks);
+                    num_disk_walks -= interval_walks;
+                    wid_t nwalks = walk_manager->load_disk_walks(cache->walk_blocks[pos], interval_walks, disk_load_walks);
+                    disk_load_walks += interval_walks;
+                    update_walk(userprogram, nwalks, sampler);
+                    logstream(LOG_DEBUG) << "load disk walks from " << cache->walk_blocks[pos] / nblocks << " to " << cache->walk_blocks[pos] % nblocks << ", walks = " << nwalks << std::endl;
+                }
+                walk_manager->dump_walks(cache->walk_blocks[pos]);
+                pos++;
+            }
             run_count++;
         }
         logstream(LOG_DEBUG) << gtimer.runtime() << "s, total run count : " << run_count << std::endl;

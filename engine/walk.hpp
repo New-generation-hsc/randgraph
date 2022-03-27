@@ -198,9 +198,7 @@ public:
     }
 
     size_t load_memory_walks(bid_t exec_block) {
-        wid_t mwalk_count = this->nmwalks(exec_block);
-        walks.clear();
-
+        
         /* load in memory walks */
         for (tid_t t = 0; t < nthreads; t++)
         {
@@ -218,9 +216,7 @@ public:
         {
             block_walks[exec_block][t].clear();
         }
-
-        assert(mwalk_count == walks.size());
-        return walks.size();
+        return 0;
     }
 
     size_t load_disk_walks(bid_t exec_block, wid_t walk_cnt, wid_t loaded_walks) {

@@ -32,8 +32,8 @@ int main(int argc, const char *argv[])
     bool dynamic = get_option_bool("dynamic");
     size_t cache_size = get_option_int("cache", MEMORY_CACHE / (1024LL * 1024 * 1024));
     size_t max_iter = get_option_int("iter", 30);
-    wid_t walks = (wid_t)get_option_int("walkpersource", 10);
-    hid_t steps = (hid_t)get_option_int("length", 80);
+    wid_t walks = (wid_t)get_option_int("walkpersource", 1);
+    hid_t steps = (hid_t)get_option_int("length", 20);
     real_t p = (real_t)get_option_float("p", 0.5);
     real_t q = (real_t)get_option_float("q", 2.0);
 

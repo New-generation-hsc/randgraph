@@ -809,7 +809,7 @@ private:
             for(auto c_blk : buckets) {
                 if(block_walks[p_blk * nblocks + c_blk] > 0) {
                     std::cout << p_blk << " -> " << c_blk << ", ";
-                    bucket_sequences.push_back(p_blk * nblocks + c_blk);
+                    cache.walk_blocks.push_back(p_blk * nblocks + c_blk);
                 }
             }
         }
@@ -828,16 +828,9 @@ public:
     bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager)
     {
         _m.start_time("simulated_annealing_scheduler_swap_blocks");
-        if(index == bucket_sequences.size()) {
-            bucket_sequences.clear();
-            buckets.clear();
-            choose_blocks(cache, driver, walk_manager);
-            for(auto blk : buckets) std::cout << blk << " ";
-            std::cout << std::endl;
-            index = 0;
-        }
+        choose_blocks(cache, driver, walk_manager);
         _m.stop_time("simulated_annealing_scheduler_swap_blocks");
-        return bucket_sequences[index++];
+        return 0;
     }
 };
 
@@ -1122,7 +1115,7 @@ private:
                 if (block_walks[p_blk * nblocks + c_blk] > 0)
                 {
                     std::cout << p_blk << " -> " << c_blk << ", ";
-                    bucket_sequences.push_back(p_blk * nblocks + c_blk);
+                    cache.walk_blocks.push_back(p_blk * nblocks + c_blk);
                 }
             }
         }
@@ -1141,18 +1134,9 @@ public:
     bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager)
     {
         _m.start_time("simulated_annealing_scheduler_swap_blocks");
-        if (index == bucket_sequences.size())
-        {
-            bucket_sequences.clear();
-            buckets.clear();
-            choose_blocks(cache, driver, walk_manager);
-            for (auto blk : buckets)
-                std::cout << blk << " ";
-            std::cout << std::endl;
-            index = 0;
-        }
+        choose_blocks(cache, driver, walk_manager);
         _m.stop_time("simulated_annealing_scheduler_swap_blocks");
-        return bucket_sequences[index++];
+        return 0;
     }
 };
 
@@ -1345,8 +1329,7 @@ private:
             {
                 if (block_walks[p_blk * nblocks + c_blk] > 0)
                 {
-                    std::cout << p_blk << " -> " << c_blk << ", ";
-                    bucket_sequences.push_back(p_blk * nblocks + c_blk);
+                    cache.walk_blocks.push_back(p_blk * nblocks + c_blk);
                 }
             }
         }
@@ -1365,18 +1348,9 @@ public:
     bid_t schedule(graph_cache &cache, graph_driver &driver, graph_walk<walk_data_t, walk_type> &walk_manager)
     {
         _m.start_time("simulated_annealing_scheduler_swap_blocks");
-        if (index == bucket_sequences.size())
-        {
-            bucket_sequences.clear();
-            buckets.clear();
-            choose_blocks(cache, driver, walk_manager);
-            for (auto blk : buckets)
-                std::cout << blk << " ";
-            std::cout << std::endl;
-            index = 0;
-        }
+        choose_blocks(cache, driver, walk_manager);
         _m.stop_time("simulated_annealing_scheduler_swap_blocks");
-        return bucket_sequences[index++];
+        return 0;
     }
 };
 
