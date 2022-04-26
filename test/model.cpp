@@ -22,9 +22,10 @@ int main(int argc, char **argv)
     int num_cache = 2;
 
     std::vector<size_t> verts = {0, 1, 2, 3};
+    std::vector<bool> cache_blocks = {1, 1, 0, 0};
 
     // DataModel data(edges, verts, num_vert, num_edge, num_cache);
-    DataModel data(edges, num_vert, num_edge, num_cache);
+    DataModel data(edges, cache_blocks, num_vert, num_edge, num_cache, 1);
     std::vector<bool> ans(num_vert);
     bool ret = operations_research::lp_solve_schedule(data, ans);
     if(ret) {
